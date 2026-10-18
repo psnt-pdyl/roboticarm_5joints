@@ -11,6 +11,12 @@ bin. Two networks drive it, both trained on the arm's physics:
 Run `python -m http.server 8765` in this folder and open <http://localhost:8765/>. Training code is
 in `arm5/` (PyTorch).
 
+![One pick and drop: the camera finds the part, the GNN chooses each pose, the PINN plans each move](docs/pick_and_drop.gif)
+
+One full vision cycle with a 2 kg part (8 s): park over the bin, look, approach, grip, lift, carry
+over the top and drop, with the live motor torque of each joint below. Full quality:
+[docs/pick_and_drop.mp4](docs/pick_and_drop.mp4).
+
 **The arm.** Links of 220, 180, 150 and 110 mm plus a 120 mm tool (780 mm reach); joint ranges
 A1 −20…200°, A2–A5 ±150°; motors of 297, 154, 111, 68 and 32 N·m; parts up to 12 kg. A target (tool
 point x, z and tool angle φ) fixes only three of the five joints, so every target has infinitely
