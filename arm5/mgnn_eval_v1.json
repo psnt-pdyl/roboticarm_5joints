@@ -1,0 +1,136 @@
+{
+  "random_moves": {
+    "gnn_plus_pinn": {
+      "within_1mm_pct": 98.50000739097595,
+      "end_holding_effort": 0.1390690952539444,
+      "path_effort": 0.1013755053281784,
+      "path_peak_pct": 39.905568957328796,
+      "moves_over_rating_pct": 0.0,
+      "moves_colliding_pct": 2.4000000208616257,
+      "closest_clearance_p5_mm": 5.839583396911621
+    },
+    "motion_gnn": {
+      "within_1mm_pct": 98.7000048160553,
+      "end_holding_effort": 0.14180506765842438,
+      "path_effort": 0.1530311554670334,
+      "path_peak_pct": 29.76081669330597,
+      "moves_over_rating_pct": 0.10000000474974513,
+      "moves_colliding_pct": 2.1000001579523087,
+      "closest_clearance_p5_mm": 5.845841407775879
+    }
+  },
+  "carry": [
+    {
+      "part_x": 313.0,
+      "kg": 2.0,
+      "gnn_plus_pinn_x1.0": {
+        "duration_s": 1.4895713329315186,
+        "effort": 0.05689224228262901,
+        "peak_pct": 29.32911217212677,
+        "min_clearance_mm": 31.999954223632812
+      },
+      "motion_gnn_x1.0": {
+        "duration_s": 1.4895713329315186,
+        "effort": 0.09892464429140091,
+        "peak_pct": 25.523093342781067,
+        "min_clearance_mm": 31.99996566772461
+      },
+      "gnn_plus_pinn_x1.5": {
+        "duration_s": 2.2343568801879883,
+        "effort": 0.04523023962974548,
+        "peak_pct": 24.80776309967041,
+        "min_clearance_mm": 31.999954223632812
+      },
+      "motion_gnn_x1.5": {
+        "duration_s": 2.2343568801879883,
+        "effort": 0.07030010968446732,
+        "peak_pct": 21.91927582025528,
+        "min_clearance_mm": 31.999977111816406
+      }
+    },
+    {
+      "part_x": 590.0,
+      "kg": 2.0,
+      "gnn_plus_pinn_x1.0": {
+        "duration_s": 1.115196704864502,
+        "effort": 0.10060834884643555,
+        "peak_pct": 42.58722960948944,
+        "min_clearance_mm": 30.315017700195312
+      },
+      "motion_gnn_x1.0": {
+        "duration_s": 1.115196704864502,
+        "effort": 0.1754443347454071,
+        "peak_pct": 39.827942848205566,
+        "min_clearance_mm": 30.315189361572266
+      },
+      "gnn_plus_pinn_x1.5": {
+        "duration_s": 1.672795057296753,
+        "effort": 0.0798364207148552,
+        "peak_pct": 41.02678298950195,
+        "min_clearance_mm": 30.315017700195312
+      },
+      "motion_gnn_x1.5": {
+        "duration_s": 1.672795057296753,
+        "effort": 0.11861398071050644,
+        "peak_pct": 32.69965052604675,
+        "min_clearance_mm": 30.315189361572266
+      }
+    },
+    {
+      "part_x": 313.0,
+      "kg": 12.0,
+      "gnn_plus_pinn_x1.0": {
+        "duration_s": 1.4836437702178955,
+        "effort": 0.24954210221767426,
+        "peak_pct": 48.666003346443176,
+        "min_clearance_mm": 31.99996566772461
+      },
+      "motion_gnn_x1.0": {
+        "duration_s": 1.4836437702178955,
+        "effort": 0.8450058698654175,
+        "peak_pct": 73.44496846199036,
+        "min_clearance_mm": 31.99997329711914
+      },
+      "gnn_plus_pinn_x1.5": {
+        "duration_s": 2.225465774536133,
+        "effort": 0.21286004781723022,
+        "peak_pct": 45.205751061439514,
+        "min_clearance_mm": 31.999958038330078
+      },
+      "motion_gnn_x1.5": {
+        "duration_s": 2.225465774536133,
+        "effort": 0.5574085712432861,
+        "peak_pct": 60.553401708602905,
+        "min_clearance_mm": 31.999961853027344
+      }
+    },
+    {
+      "part_x": 590.0,
+      "kg": 12.0,
+      "gnn_plus_pinn_x1.0": {
+        "duration_s": 1.1224949359893799,
+        "effort": 0.41141632199287415,
+        "peak_pct": 74.8939573764801,
+        "min_clearance_mm": 28.920360565185547
+      },
+      "motion_gnn_x1.0": {
+        "duration_s": 1.1224949359893799,
+        "effort": 1.2052091360092163,
+        "peak_pct": 96.01438641548157,
+        "min_clearance_mm": 28.920513153076172
+      },
+      "gnn_plus_pinn_x1.5": {
+        "duration_s": 1.6837427616119385,
+        "effort": 0.33544543385505676,
+        "peak_pct": 68.30884218215942,
+        "min_clearance_mm": 28.920360565185547
+      },
+      "motion_gnn_x1.5": {
+        "duration_s": 1.6837427616119385,
+        "effort": 0.7411234378814697,
+        "peak_pct": 68.47984790802002,
+        "min_clearance_mm": 28.920513153076172
+      }
+    }
+  ]
+}

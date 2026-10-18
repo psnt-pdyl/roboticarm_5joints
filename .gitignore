@@ -1,0 +1,7 @@
+# checkpoints and generated datasets
+*.pt
+__pycache__/
+*.pyc
+# spreadsheet lock files
+.~lock.*
+~$*

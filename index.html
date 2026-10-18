@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Five-Joint Arm Cell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the work cell canvas is the hero with a torque trace beneath; a control pendant sits to its right. Stacks on phones. */
+:root{
+  --bg:#e3e7eb; --panel:#f4f6f8; --fg:#17202a; --muted:#596775; --line:#c4cdd6; --grid:#d5dce3;
+  --arm:#efb300; --arm-edge:#7a5900; --joint:#28323d; --steel:#a7b2bd; --block:#687a8c; --block-edge:#35424f; --pad:#9aa6b2;
+  --alert:#c93c24; --ok:#2a8755; --live:#1f6bcc;
+  --q1:#1f6bcc; --q2:#c4430e; --q3:#0d877b; --q4:#7048c8; --q5:#9a6f00;
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif; --f-body:"Barlow",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141a; --panel:#171e26; --fg:#e4e9ef; --muted:#8c99a7; --line:#2a3541; --grid:#222c37;
+  --arm:#f4bf27; --arm-edge:#8f6a00; --joint:#4a5868; --steel:#7f8c99; --block:#55687c; --block-edge:#2a3542; --pad:#5a6877;
+  --alert:#f0674c; --ok:#4cc187; --live:#5d9ef2;
+  --q1:#5d9ef2; --q2:#f07d42; --q3:#33c3b3; --q4:#a58cf0; --q5:#d9b13a; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f141a; --panel:#171e26; --fg:#e4e9ef; --muted:#8c99a7; --line:#2a3541; --grid:#222c37;
+  --arm:#f4bf27; --arm-edge:#8f6a00; --joint:#4a5868; --steel:#7f8c99; --block:#55687c; --block-edge:#2a3542; --pad:#5a6877;
+  --alert:#f0674c; --ok:#4cc187; --live:#5d9ef2;
+  --q1:#5d9ef2; --q2:#f07d42; --q3:#33c3b3; --q4:#a58cf0; --q5:#d9b13a; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:1280px;margin:0 auto;display:grid;gap:16px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font:700 clamp(28px,4.2vw,42px)/1 var(--f-display);margin:0;text-transform:uppercase;letter-spacing:.01em;text-wrap:balance}
+.spec{font:12px var(--f-mono);color:var(--muted);margin:6px 0 0}
+a{color:var(--live)}
+.pill{font:12px var(--f-mono);letter-spacing:.08em;padding:5px 11px;border-radius:999px;border:1px solid currentColor;display:inline-flex;gap:8px;align-items:center;white-space:nowrap;color:var(--ok)}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.pill[data-s="pause"]{color:var(--muted)} .pill[data-s="live"]{color:var(--live)} .pill[data-s="alert"]{color:var(--alert)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.stage{display:grid;gap:16px;min-width:0}
+.cell{position:relative;aspect-ratio:16/10;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.cell canvas{width:100%;height:100%;display:block;touch-action:pan-y}
+.cell.follow canvas{touch-action:none;cursor:crosshair}
+.cell.pick canvas{cursor:pointer}
+.cam{width:100%;height:auto;aspect-ratio:4/1;display:block;image-rendering:pixelated;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.hint{position:absolute;left:10px;top:10px;right:10px;max-width:50ch;font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 9px;pointer-events:none;margin:0}
+.trace{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px 8px;display:grid;gap:6px}
+.trace header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 14px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;font:12px var(--f-mono);color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.trace canvas{width:100%;height:140px;display:block}
+.pendant{background:var(--panel);border:1px solid var(--line);border-radius:6px;display:grid;min-width:0}
+.sec{padding:14px 16px;border-top:1px solid var(--line);display:grid;gap:10px;min-width:0}
+.sec:first-child{border-top:0}
+.label{font:600 13px var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg button{font:600 15px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;padding:10px 4px;background:transparent;color:var(--fg);border:0;border-left:1px solid var(--line);cursor:pointer}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--panel)}
+.seg button:disabled{color:var(--muted);cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:600 14px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;padding:9px 14px;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.btn.primary{background:var(--arm);border-color:var(--arm-edge);color:#1b1500}
+.ctl{display:grid;gap:4px}
+.ctl .tl{display:flex;justify-content:space-between;font-size:14px}
+.ctl output{font:13px var(--f-mono);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--fg);margin:0}
+.num{display:flex;align-items:center;gap:8px}
+.num input{width:7em;font:14px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--fg);background:var(--panel);
+  border:1px solid var(--line);border-radius:4px;padding:5px 8px}
+.num input:focus-visible{outline:2px solid var(--live);outline-offset:1px}
+.num input:invalid{border-color:var(--alert)}
+.num span{font-size:14px;color:var(--muted)}
+.note{font-size:13px;color:var(--muted);margin:0}
+.tele{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0}
+.tele div{display:grid;gap:1px;min-width:0}
+.tele .wide{grid-column:1 / -1}
+.tele dt{font:600 11.5px/1.2 var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.tele dd{margin:0;font:14px var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tele dd.warn{color:var(--alert)}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--live);outline-offset:2px}
+@media (max-width:880px){.layout{grid-template-columns:minmax(0,1fr)} .cell{aspect-ratio:4/3}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Five-joint arm cell</h1>
+      <p class="spec">5R manipulator · links 220 · 180 · 150 · 110 · tool 120 · reach 780 mm · motors <span id="spec-motors">–</span> N·m</p>
+    </div>
+    <span class="pill" id="pill">RUN · AUTO</span>
+  </header>
+
+  <div class="layout">
+    <div class="stage">
+      <div class="cell" id="cellWrap">
+        <canvas id="cell" aria-label="Side view of the five-joint arm work cell"></canvas>
+        <p class="hint" id="hint"></p>
+      </div>
+      <section class="trace" aria-label="Motor torque history">
+        <header>
+          <span class="label">Motor torque · last 8 s · % of limit</span>
+          <span class="legend" id="legend"></span>
+        </header>
+        <canvas id="trace"></canvas>
+      </section>
+    </div>
+
+    <aside class="pendant" aria-label="Pendant">
+      <div class="sec">
+        <div class="label">Mode</div>
+        <div class="seg" role="group" aria-label="Control mode">
+          <button id="m-program" aria-pressed="true">Program</button>
+          <button id="m-follow" aria-pressed="false">Follow</button>
+          <button id="m-vision" aria-pressed="false">Vision</button>
+        </div>
+        <div class="row" id="prog-ctl">
+          <button class="btn primary" id="run">Pause</button>
+          <button class="btn" id="reset">Reset cell</button>
+        </div>
+        <p class="note" id="step">–</p>
+      </div>
+
+      <div class="sec" id="g-vision" hidden>
+        <div class="label" style="display:flex;justify-content:space-between"><span>Camera</span><span id="v-count" style="color:var(--fg)">0 binned · 0 missed</span></div>
+        <canvas class="cam" id="cam" width="640" height="160" aria-label="The camera image the vision network sees, with the part it found"></canvas>
+        <p class="note" id="v-note">Waiting for the first look.</p>
+        <button class="btn" id="rec" title="Runs one full cycle with the current settings and downloads every 1/240 s control step as CSV">Record one pick and drop (CSV)</button>
+      </div>
+
+      <div class="sec">
+        <div class="label">IK solver</div>
+        <div class="seg" role="group" aria-label="Inverse kinematics solver">
+          <button id="s-gnn" aria-pressed="true">GNN · least torque</button>
+          <button id="s-num" aria-pressed="false">Numerical</button>
+        </div>
+        <p class="note" id="s-note"></p>
+      </div>
+
+      <div class="sec">
+        <div class="label">Joint-move motion</div>
+        <div class="seg" role="group" aria-label="How joint moves are shaped">
+          <button id="mo-blend" aria-pressed="true">Joint blend</button>
+          <button id="mo-pinn" aria-pressed="false">PINN</button>
+          <button id="mo-mgnn" aria-pressed="false">Motion GNN</button>
+        </div>
+        <p class="note" id="mo-note"></p>
+      </div>
+
+      <div class="sec">
+        <div class="ctl"><div class="tl"><label for="pm">Part weight</label><output id="pm-o"></output></div>
+          <div class="num"><input type="number" id="pm" min="0" step="0.5" value="2" inputmode="decimal"><span>kg</span></div></div>
+        <div class="ctl"><div class="tl"><label for="ov">Speed override</label><output id="ov-o">100 %</output></div>
+          <input type="range" id="ov" min="10" max="200" step="5" value="100"></div>
+        <div class="ctl" id="phi-ctl" hidden><div class="tl"><label for="phi">Tool angle</label><output id="phi-o">−90°</output></div>
+          <input type="range" id="phi" min="-180" max="180" step="1" value="-90"></div>
+      </div>
+
+      <div class="sec">
+        <div class="label">Telemetry</div>
+        <dl class="tele">
+          <div class="wide"><dt>Joint angles A1 · A2 · A3 · A4 · A5</dt><dd id="t-q">–</dd></div>
+          <div><dt>Tool X · Z</dt><dd id="t-xz">–</dd></div>
+          <div><dt>Tool angle</dt><dd id="t-phi">–</dd></div>
+          <div><dt>IK error</dt><dd id="t-ike">–</dd></div>
+          <div><dt>IK time</dt><dd id="t-ikt">–</dd></div>
+          <div class="wide"><dt>Holding torque now, % of limit</dt><dd id="t-hold">–</dd></div>
+          <div class="wide"><dt>Motor torque now, % of limit</dt><dd id="t-tq">–</dd></div>
+          <div class="wide"><dt>Peak torque per joint, last move</dt><dd id="t-tp">–</dd></div>
+          <div class="wide"><dt>Max torque observed per joint, N·m (since this mode started or was reset)</dt><dd id="t-max">–</dd></div>
+          <div><dt>Holding effort</dt><dd id="t-eff">–</dd></div>
+          <div><dt>Gripper</dt><dd id="t-g">–</dd></div>
+          <div class="wide"><dt>Part clearance from the arm, last carry (closest)</dt><dd id="t-clr">–</dd></div>
+          <div class="wide"><dt>Arm clearance from itself, now · closest so far</dt><dd id="t-self">–</dd></div>
+        </dl>
+      </div>
+    </aside>
+  </div>
+  <p class="spec" id="missing" hidden>Weights not found. Serve the folder (python -m http.server 8765) and open http://localhost:8765/; arm5-weights.js must sit next to this page.</p>
+</div>
+
+<script src="arm5-weights.js"></script>
+<script src="vision-weights.js"></script>
+<script src="arm5-pinn-weights.js"></script>
+<script src="arm5-mgnn-weights.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const W = window.ARM5;
+if (!W) { $('missing').hidden = false; return; }
+const A = W.arm, N = A.n, LEN = A.len_mm, SH = { x: A.sh[0], y: A.sh[1] }, LIM = A.lim, REACH = LEN.reduce((a, b) => a + b, 0);
+const D = Math.PI / 180, BS = 60, SAFE = 270, PHI_DOWN = -90 * D, STN = { A: 300, B: 540 };
+const VMAX = [110, 130, 160, 200, 240].map(v => v * D), AMAX = [320, 380, 480, 600, 700].map(v => v * D);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const wrapPi = a => Math.atan2(Math.sin(a), Math.cos(a));
+const fmtDeg = r => (r < 0 ? '−' : '') + Math.abs(r / D).toFixed(0) + '°';
+
+// ---------- kinematics, refinement, dynamics ----------
+function chain(q) {
+  const p = [{ x: SH.x, y: SH.y }]; let a = 0;
+  for (let i = 0; i < N; i++) { a += q[i]; p.push({ x: p[i].x + LEN[i] * Math.cos(a), y: p[i].y + LEN[i] * Math.sin(a) }); }
+  return { p, t: p[N], phi: a };
+}
+// Damped least squares toward (tx, ty, phi): smallest joint change per step, clamped to the joint limits.
+function refine(q, tx, ty, phi, steps, lam = 5) {
+  q = q.slice();
+  for (let s = 0; s < steps; s++) {
+    const { p, t, phi: a } = chain(q), e = [tx - t.x, ty - t.y, wrapPi(phi - a) * 100];
+    const J = [[], [], []];
+    for (let i = 0; i < N; i++) { J[0].push(-(t.y - p[i].y)); J[1].push(t.x - p[i].x); J[2].push(100); }
+    const M = [0, 1, 2].map(r => [0, 1, 2].map(c => J[r].reduce((acc, v, i) => acc + v * J[c][i], 0) + (r === c ? lam * lam : 0)));
+    const det = M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+    const inv = [[M[1][1] * M[2][2] - M[1][2] * M[2][1], M[0][2] * M[2][1] - M[0][1] * M[2][2], M[0][1] * M[1][2] - M[0][2] * M[1][1]],
+                 [M[1][2] * M[2][0] - M[1][0] * M[2][2], M[0][0] * M[2][2] - M[0][2] * M[2][0], M[0][2] * M[1][0] - M[0][0] * M[1][2]],
+                 [M[1][0] * M[2][1] - M[1][1] * M[2][0], M[0][1] * M[2][0] - M[0][0] * M[2][1], M[0][0] * M[1][1] - M[0][1] * M[1][0]]];
+    const y = [0, 1, 2].map(r => (inv[r][0] * e[0] + inv[r][1] * e[1] + inv[r][2] * e[2]) / det);
+    for (let i = 0; i < N; i++) q[i] = clamp(q[i] + J[0][i] * y[0] + J[1][i] * y[1] + J[2][i] * y[2], LIM[i][0], LIM[i][1]);
+  }
+  return q;
+}
+// Collision penalty (mm^2): circles along the links must keep MARGIN clear of the floor, of the bin (in the
+// vision cell) and of the carried part (the gripper's own link excluded).
+const MARGIN = 30, PART_R = 60 / Math.SQRT2, LINK_RS = [29, 24, 20, 16, 14];
+function penalty(q) {
+  const c = chain(q), hit = d => d < MARGIN ? (MARGIN - d) ** 2 : 0; let P = 0;
+  for (let i = 0; i < N; i++) for (const t of [0.25, 0.5, 0.75, 1]) {
+    const a = c.p[i], b = c.p[i + 1], x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t, r = LINK_RS[i];
+    if (i === N - 1) continue;   // the gripper's own link: it has to reach down to the floor and into the bin
+    P += hit(y - r);
+    if (mode === 'vision') P += hit(Math.hypot(x - clamp(x, BIN.x - BIN.w / 2, BIN.x + BIN.w / 2), y - clamp(y, 0, BIN.h)) - r);
+    if (arm.held) P += hit(Math.hypot(x - c.t.x, y - c.t.y) - r - PART_R);
+  }
+  for (const g of selfGaps(q)) if (g < SELF_MARGIN) P += (SELF_MARGIN - g) ** 2;
+  return P;
+}
+// Self-collision, as self_clearance() in arm5/kin.py: the arm's parts as capsules (links A1-A4, the joint housings,
+// the gripper's crossbar and fingers) must keep SELF_MARGIN from parts they do not join, and from the pedestal.
+const SELF_MARGIN = 10, BODY_NAMES = ['link 1', 'link 2', 'link 3', 'link 4', 'A1 housing', 'A2 housing', 'A3 housing', 'A4 housing',
+  'A5 housing', 'gripper crossbar', 'gripper finger', 'gripper finger'];
+function bodies(q) {
+  const c = chain(q), w = c.p[N - 1], L5 = LEN[N - 1], u = { x: (c.t.x - w.x) / L5, y: (c.t.y - w.y) / L5 }, n = { x: -u.y, y: u.x };
+  const at = (a, b) => ({ x: w.x + u.x * a + n.x * b, y: w.y + u.y * a + n.y * b }), B = [];
+  for (let k = 0; k < N - 1; k++) B.push({ a: c.p[k], b: c.p[k + 1], r: LINK_RS[k], link: k, grip: false });
+  for (let k = 0; k < N; k++) B.push({ a: c.p[k], b: c.p[k], r: JOINT_R[k], link: k - 0.5, grip: false });
+  B.push({ a: at(L5 - 62, -64), b: at(L5 - 62, 64), r: 10, link: 4, grip: true });
+  for (const sg of [-1, 1]) B.push({ a: at(L5 - 50, sg * 61), b: at(L5 + 12, sg * 61), r: 6, link: 4, grip: true });
+  return B;
+}
+let SELF_PAIRS = null;   // built on first use: the housing radii are defined further down
+function selfPairs() { if (SELF_PAIRS) return SELF_PAIRS; const B = bodies(new Array(5).fill(0)), P = [];
+  for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+    const gap = Math.abs(B[i].link - B[j].link), grip = (B[i].grip || B[j].grip) && Math.min(B[i].link, B[j].link) === 3;
+    if (gap >= 1.5 || grip) P.push([i, j]);
+  } return (SELF_PAIRS = P); }
+function segDist(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1e-9), 0, 1);
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+function segSeg(a, b, c, d) {
+  const m = Math.min(segDist(a, c, d), segDist(b, c, d), segDist(c, a, b), segDist(d, a, b));
+  const cr = (o, u, v) => (u.x - o.x) * (v.y - o.y) - (u.y - o.y) * (v.x - o.x);
+  return cr(a, b, c) * cr(a, b, d) < 0 && cr(c, d, a) * cr(c, d, b) < 0 ? -m : m;
+}
+function baseDist(p) {
+  const y = clamp(p.y, 0, SH.y - 30), half = 80 - 28 * y / (SH.y - 30);
+  return Math.hypot(Math.max(0, Math.abs(p.x) - half), Math.max(0, p.y - (SH.y - 30)) + Math.max(0, -p.y));
+}
+// Gaps in mm (negative = collision): each pair of parts that can meet, then each part (but link 1 and the A1 and A2
+// housings, which sit on it) against the pedestal. With names = true, also which parts.
+function selfGaps(q, names = false) {
+  const B = bodies(q), G = [], who = [];
+  for (const [i, j] of selfPairs()) { G.push(segSeg(B[i].a, B[i].b, B[j].a, B[j].b) - B[i].r - B[j].r); who.push(BODY_NAMES[i] + ' and ' + BODY_NAMES[j]); }
+  B.forEach((b, k) => { if (b.link < 1) return;
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) { G.push(baseDist({ x: b.a.x + (b.b.x - b.a.x) * t, y: b.a.y + (b.b.y - b.a.y) * t }) - b.r); who.push(BODY_NAMES[k] + ' and the pedestal'); } });
+  return names ? { G, who } : G;
+}
+function selfClearance(q) {
+  const { G, who } = selfGaps(q, true); let k = 0;
+  for (let i = 1; i < G.length; i++) if (G[i] < G[k]) k = i;
+  return { gap: G[k], who: who[k] };
+}
+// One step of collision avoidance in the arm's null space: move down the penalty's gradient using only the
+// joint motion that leaves the tool point and tool angle where they are (two spare joints on this arm).
+function avoid(q, step = 0.01) {
+  const P0 = penalty(q); if (P0 === 0) return q;
+  const grad = q.map((_, i) => { const qq = q.slice(); qq[i] += 1e-3; return (penalty(qq) - P0) / 1e-3; });
+  const { p, t } = chain(q), J = [[], [], []];
+  for (let i = 0; i < N; i++) { J[0].push(-(t.y - p[i].y)); J[1].push(t.x - p[i].x); J[2].push(100); }
+  const Jg = J.map(r => r.reduce((a, v, i) => a + v * grad[i], 0));
+  const M = [0, 1, 2].map(r => [0, 1, 2].map(c => J[r].reduce((a, v, i) => a + v * J[c][i], 0) + (r === c ? 1 : 0)));
+  const y = solve3(M, Jg), ng = grad.map((gi, i) => gi - (J[0][i] * y[0] + J[1][i] * y[1] + J[2][i] * y[2]));
+  const m = Math.max(...ng.map(Math.abs)); if (m < 1e-9) return q;
+  return q.map((v, i) => clamp(v - step * ng[i] / m, LIM[i][0], LIM[i][1]));
+}
+function solve3(M, e) {
+  const det = M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+  const inv = [[M[1][1] * M[2][2] - M[1][2] * M[2][1], M[0][2] * M[2][1] - M[0][1] * M[2][2], M[0][1] * M[1][2] - M[0][2] * M[1][1]],
+               [M[1][2] * M[2][0] - M[1][0] * M[2][2], M[0][0] * M[2][2] - M[0][2] * M[2][0], M[0][2] * M[1][0] - M[0][0] * M[1][2]],
+               [M[1][0] * M[2][1] - M[1][1] * M[2][0], M[0][1] * M[2][0] - M[0][0] * M[2][1], M[0][0] * M[1][1] - M[0][1] * M[1][0]]];
+  return [0, 1, 2].map(r => (inv[r][0] * e[0] + inv[r][1] * e[1] + inv[r][2] * e[2]) / det);
+}
+// Motor torques as fractions of each limit: planar Newton-Euler, as inverse_dynamics() in arm5/kin.py.
+function torques(q, qd, qdd, payload) {
+  const L = LEN.map(v => v / 1000), m = A.mass, g = A.g;
+  let a = 0, ad = 0, add = 0; const u = [], rel = [], acc = [];
+  for (let k = 0; k < N; k++) {
+    a += q[k]; ad += qd[k]; add += qdd[k]; acc.push(add);
+    const cs = Math.cos(a), sn = Math.sin(a); u.push([cs, sn]); rel.push([-add * sn - ad * ad * cs, add * cs - ad * ad * sn]);
+  }
+  const p = [[0, 0]];
+  for (let k = 0; k < N; k++) p.push([p[k][0] + L[k] * rel[k][0], p[k][1] + L[k] * rel[k][1]]);
+  let F = [payload * p[N][0], payload * (p[N][1] + g)], tn = 0; const tau = new Array(N), cross = (r, f) => r[0] * f[1] - r[1] * f[0];
+  for (let k = N - 1; k >= 0; k--) {
+    const c = A.com_m ? A.com_m[k] : L[k] / 2, I = A.inertia ? A.inertia[k] : m[k] * L[k] * L[k] / 12;   // motors sit at the joints
+    const Fk = [m[k] * (p[k][0] + c * rel[k][0]) + F[0], m[k] * (p[k][1] + c * rel[k][1] + g) + F[1]];
+    tau[k] = I * acc[k] + tn + c * cross(u[k], Fk) + (L[k] - c) * cross(u[k], F); F = Fk; tn = tau[k];
+  }
+  return tau.map((t, i) => t / A.tau_max[i]);
+}
+const holding = (q, m) => torques(q, new Array(N).fill(0), new Array(N).fill(0), m);
+
+// ---------- the GNN (same forward pass as arm5/model.py) ----------
+// A trained chain graph network (arm5/model.py, arm5/motion_gnn.py): fixed node rows plus the inputs that
+// fill(row, node) adds, six rounds of messages, one angle per joint node.
+function graphNet(W) {
+  const T = {};
+  for (const [k, v] of Object.entries(W.tensors)) {
+    const bin = atob(v.b64), buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    T[k] = { s: v.shape, d: new Float32Array(buf.buffer) };
+  }
+  const H = W.hidden, NS = W.steps, NN = N + 2, src = Array.from(T.src.d, Math.round), dst = Array.from(T.dst.d, Math.round), E = src.length;
+  const NIN = T['enc_node.l1.weight'].s[1];
+  const lin = (name, x) => { const w = T[name + '.weight'], b = T[name + '.bias'], [o, n] = w.s, out = new Float32Array(o);
+    for (let i = 0; i < o; i++) { let s = b.d[i]; const r = i * n; for (let j = 0; j < n; j++) s += w.d[r + j] * x[j]; out[i] = s; } return out; };
+  const mlp = (name, x, norm = true) => {
+    const hd = lin(name + '.l1', x); for (let i = 0; i < hd.length; i++) hd[i] = hd[i] / (1 + Math.exp(-hd[i]));
+    const o = lin(name + '.l2', hd);
+    if (norm) { const g = T[name + '.norm.weight'].d, b = T[name + '.norm.bias'].d; let mu = 0, v = 0;
+      for (const a of o) mu += a; mu /= o.length; for (const a of o) v += (a - mu) * (a - mu); v /= o.length;
+      const inv = 1 / Math.sqrt(v + 1e-5); for (let i = 0; i < o.length; i++) o[i] = (o[i] - mu) * inv * g[i] + b[i]; }
+    return o;
+  };
+  const row = (t, i) => t.d.subarray(i * t.s[1], (i + 1) * t.s[1]);
+  const eEnc = Array.from({ length: E }, (_, k) => mlp('enc_edge', row(T.edge0, k)));
+  return (goal, fill) => {
+    const h = [];
+    for (let n = 0; n < NN; n++) { const x = new Float32Array(NIN); x.set(row(T.node0, n)); if (n === NN - 1) x.set(goal, NN); if (fill) fill(x, n); h.push(mlp('enc_node', x)); }
+    const e = eEnc.map(a => a.slice()), cat = new Float32Array(3 * H), cat2 = new Float32Array(2 * H);
+    for (let s = 0; s < NS; s++) {
+      for (let k = 0; k < E; k++) { cat.set(e[k], 0); cat.set(h[src[k]], H); cat.set(h[dst[k]], 2 * H);
+        const m = mlp(`edge_mlps.${s}`, cat); for (let i = 0; i < H; i++) e[k][i] += m[i]; }
+      const agg = Array.from({ length: NN }, () => new Float32Array(H));
+      for (let k = 0; k < E; k++) for (let i = 0; i < H; i++) agg[dst[k]][i] += e[k][i];
+      for (let n = 0; n < NN; n++) { cat2.set(h[n], 0); cat2.set(agg[n], H); const m = mlp(`node_mlps.${s}`, cat2); for (let i = 0; i < H; i++) h[n][i] += m[i]; }
+    }
+    return Array.from({ length: N }, (_, n) => T.q_mid.d[n] + T.q_half.d[n] * Math.tanh(mlp('dec', h[n], false)[0]));
+  };
+}
+const goalOf = (tx, ty, phi, payload) => [(tx - SH.x) / REACH, (ty - SH.y) / REACH, Math.sin(phi), Math.cos(phi), payload / A.payload_max];
+const GNN = (() => { const net = graphNet(W); return (tx, ty, phi, payload) => net(goalOf(tx, ty, phi, payload)); })();
+
+// ---------- vision (the part detector's camera and network, vision-weights.js) ----------
+const BIN = { x: -185, w: 120, h: 130, drop: 300 }, PART = { min: 180, max: 590 };
+const PART_COLORS = ['#c0392b', '#2e7d32', '#1565c0', '#6a1b9a', '#ef6c00', '#00838f', '#ad1457', '#5d4037'];
+const LINK_R = [29, 24, 20, 16], JOINT_R = [44, 36, 30, 25, 21];
+const VISION = (() => {
+  const V = window.VISION_NET; if (!V) return null;
+  const T = {};
+  for (const [k, v] of Object.entries(V.tensors)) {
+    const bin = atob(v.b64), buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    T[k] = { s: v.shape, d: new Float32Array(buf.buffer) };
+  }
+  const cam = V.camera, R = cam.radii, COL = cam.colors, layers = Object.keys(T).filter(k => k.endsWith('.weight')).length;
+  const hi = document.createElement('canvas'); hi.width = cam.w * cam.ss; hi.height = cam.h * cam.ss;
+  const g = hi.getContext('2d', { willReadFrequently: true }), s = hi.width / (cam.x1 - cam.x0);
+  const stroke = (a, b, r, col) => { g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 2 * r; g.lineCap = 'round'; g.beginPath();
+    if (a.x === b.x && a.y === b.y) { g.arc(a.x, a.y, r, 0, 7); g.fill(); } else { g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); } };
+  // The camera image: floor, parts, and this arm drawn in the camera's flat colours (it is usually out of view when looking).
+  function capture() {
+    g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = COL.bg; g.fillRect(0, 0, hi.width, hi.height);
+    g.setTransform(s, 0, 0, -s, -cam.x0 * s, cam.z1 * s);
+    g.fillStyle = COL.floor; g.fillRect(cam.x0 - 10, cam.z0 - 10, cam.x1 - cam.x0 + 20, 10 - cam.z0);
+    for (const b of blocks) { g.save(); g.translate(b.x, b.y); g.rotate(b.ang); g.fillStyle = b.color || '#687a8c'; g.fillRect(-cam.part / 2, -cam.part / 2, cam.part, cam.part); g.restore(); }
+    const c = chain(arm.q), w = c.p[N - 1], u = { x: Math.cos(c.phi), y: Math.sin(c.phi) }, half = 12 + 43 * arm.g, L5 = LEN[N - 1];
+    const P = (a, b) => ({ x: w.x + u.x * a - u.y * b, y: w.y + u.y * a + u.x * b });
+    for (let i = 0; i < N - 1; i++) { stroke(c.p[i], c.p[i + 1], LINK_R[i], COL.arm); stroke(c.p[i], c.p[i], JOINT_R[i], COL.dark); }
+    stroke(w, P(L5 - 68, 0), R.rod, COL.dark); stroke(P(L5 - 62, -64), P(L5 - 62, 64), R.plate, COL.dark);
+    for (const sg of [-1, 1]) stroke(P(L5 - 50, sg * (half + 6)), P(L5 + 12, sg * (half + 6)), R.finger, COL.steel);
+    stroke(w, w, JOINT_R[N - 1], COL.dark);
+    const d = g.getImageData(0, 0, hi.width, hi.height).data, n = cam.h * cam.w, out = new Float32Array(3 * n);
+    for (let i = 0; i < cam.h; i++) for (let j = 0; j < cam.w; j++) { const o = i * cam.w + j;
+      for (let dy = 0; dy < cam.ss; dy++) for (let dx = 0; dx < cam.ss; dx++) { const p = ((i * cam.ss + dy) * hi.width + j * cam.ss + dx) * 4; out[o] += d[p]; out[n + o] += d[p + 1]; out[2 * n + o] += d[p + 2]; } }
+    for (let i = 0; i < out.length; i++) out[i] /= cam.ss * cam.ss * 255;
+    return out;
+  }
+  function conv(x, C, h, w, name, relu) {
+    const wt = T[name + '.weight'].d, bias = T[name + '.bias'].d, O = T[name + '.weight'].s[0], hw = h * w, out = new Float32Array(O * hw);
+    for (let o = 0; o < O; o++) { const ob = o * hw; out.fill(bias[o], ob, ob + hw);
+      for (let c = 0; c < C; c++) for (let ky = 0; ky < 3; ky++) for (let kx = 0; kx < 3; kx++) {
+        const wv = wt[((o * C + c) * 3 + ky) * 3 + kx], dy = ky - 1, dx = kx - 1;
+        for (let i = Math.max(0, -dy); i < Math.min(h, h - dy); i++) { const xr = c * hw + (i + dy) * w + dx, orow = ob + i * w;
+          for (let j = Math.max(0, -dx); j < Math.min(w, w - dx); j++) out[orow + j] += wv * x[xr + j]; } }
+      if (relu) for (let i = ob; i < ob + hw; i++) if (out[i] < 0) out[i] = 0; }
+    return out;
+  }
+  function pool(x, C, h, w) { const h2 = h >> 1, w2 = w >> 1, out = new Float32Array(C * h2 * w2);
+    for (let c = 0; c < C; c++) for (let i = 0; i < h2; i++) for (let j = 0; j < w2; j++) { const b = (c * h + 2 * i) * w + 2 * j;
+      out[(c * h2 + i) * w2 + j] = Math.max(x[b], x[b + 1], x[b + w], x[b + w + 1]); }
+    return out; }
+  function forward(img) {
+    let x = img.map(v => v - 0.5), C = 3, h = cam.h, w = cam.w;
+    for (let i = 0; i < layers; i++) { x = conv(x, C, h, w, `convs.${i}`, i < layers - 1); C = T[`convs.${i}.weight`].s[0];
+      if (V.pool_after.includes(i)) { x = pool(x, C, h, w); h >>= 1; w >>= 1; } }
+    let m = -Infinity; for (const v of x) if (v > m) m = v;
+    let sum = 0, u = 0, v = 0;
+    for (let i = 0; i < h; i++) for (let j = 0; j < w; j++) { const p = Math.exp(x[i * w + j] - m); sum += p; u += p * (j + 0.5) / w; v += p * (i + 0.5) / h; }
+    return { x: cam.x0 + u / sum * (cam.x1 - cam.x0), z: cam.z1 - v / sum * (cam.z1 - cam.z0) };
+  }
+  return { capture, forward, cam };
+})();
+const vis = { det: null, err: null, ms: 0, img: null, missed: 0, binned: 0 };
+
+// ---------- motion PINN (arm5/export_pinn.py; same model as arm5/motion.py) ----------
+// q(s) = q0 + (q1 - q0) b(s) + w(s) N(...), trained on the equations of motion for low effort, low peak
+// torque and clearance from the floor, the bin and the carried part.
+const PINN5 = (() => {
+  const W = window.ARM5_PINN; if (!W) return null;
+  const T = {};
+  for (const [k, v] of Object.entries(W.tensors)) {
+    const bin = atob(v.b64), buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    T[k] = { s: v.shape, d: new Float32Array(buf.buffer) };
+  }
+  const qm = T.q_mid.d, qh = T.q_half.d;
+  const lin = (name, x) => { const w = T[name + '.weight'], b = T[name + '.bias'], [o, n] = w.s, out = new Float32Array(o);
+    for (let i = 0; i < o; i++) { let s = b.d[i]; const r = i * n; for (let j = 0; j < n; j++) s += w.d[r + j] * x[j]; out[i] = s; } return out; };
+  function at(q0, q1, s, Tm, payload, info) {   // info: filled with the 13 inputs and the 5 outputs, for recording
+    let x = q0.map((v, i) => (v - qm[i]) / qh[i]).concat(q1.map((v, i) => (v - q0[i]) / qh[i]), [2 * s - 1, Math.log(Tm / W.t_ref), payload / W.payload_scale]);
+    const x0 = x.slice();
+    for (let l = 0; l < W.layers; l++) { x = lin(`layers.${l}`, x); for (let i = 0; i < x.length; i++) x[i] = x[i] / (1 + Math.exp(-x[i])); }
+    const Nn = lin('out', x); if (info) { info.x = x0; info.N = Array.from(Nn); }
+    const b = 10 * s ** 3 - 15 * s ** 4 + 6 * s ** 5, w = 64 * s ** 3 * (1 - s) ** 3;
+    return q0.map((v, i) => v + (q1[i] - v) * b + w * Nn[i]);
+  }
+  // Peak torque (fraction of the limit) of a planned move, sampled at 16 moments by finite differences.
+  function peak(q0, q1, Tm, payload) {
+    let p = 0; const d = 0.01;
+    for (let k = 1; k <= 16; k++) {
+      const s = k / 17, a = at(q0, q1, s - d, Tm, payload), b = at(q0, q1, s, Tm, payload), c = at(q0, q1, s + d, Tm, payload);
+      const qd = b.map((_, i) => (c[i] - a[i]) / (2 * d * Tm)), qdd = b.map((v, i) => (c[i] - 2 * v + a[i]) / (d * d * Tm * Tm));
+      for (const r of torques(b, qd, qdd, payload)) p = Math.max(p, Math.abs(r));
+    }
+    return p;
+  }
+  // The shortest of 1, 1.5, 2 and 3 times the blend's duration whose predicted peak stays within the motor
+  // limits; when none does (a payload these motors cannot carry), the one with the lowest peak.
+  function duration(q0, q1, Tb, payload) {
+    let best = null;
+    for (const f of [1, 1.5, 2, 3]) {
+      const Tm = Math.max(W.t_min, Tb * f), p = peak(q0, q1, Tm, payload);
+      if (p <= 1) return { T: Tm, peak: p, f };
+      if (!best || p < best.peak) best = { T: Tm, peak: p, f };
+    }
+    return best;
+  }
+  return { at, duration, eval: W.eval };
+})();
+// ---------- motion GNN (arm5/motion_gnn.py, exported by arm5/export.py) ----------
+// One graph network for the whole move: given the start pose, the target, payload, duration T and a moment s, each
+// joint gives an angle e, and q(s) = q0 + b(s) (e(b(s)) - q0). A call takes several ms here, so the page asks it every
+// 12th control step (20 times a second) for the next moment ahead and blends between those answers (cubic Hermite,
+// starting and stopping at rest). Its end pose gets the page's usual refinement, spread over the move by b(s).
+const MGNN = (() => {
+  const WM = window.ARM5_MGNN; if (!WM) return null;
+  const net = graphNet(WM), NIN0 = N + 2 + 5, DT = 12 / 240;
+  const bf = s => 10 * s ** 3 - 15 * s ** 4 + 6 * s ** 5;
+  const qn = (q0, i) => (q0[i] - A.lim[i][0] - (A.lim[i][1] - A.lim[i][0]) / 2) / ((A.lim[i][1] - A.lim[i][0]) / 2);
+  function raw(q0, goal, s, T) {
+    const sig = bf(s), x = [...q0.map((_, i) => qn(q0, i)), ...goal, 2 * sig - 1, Math.log(T)];
+    const e = net(goal, (r, n) => { if (n < N) r[NIN0] = x[n]; if (WM.time_all || n === N + 1) { r[NIN0 + 1] = x[10]; r[NIN0 + 2] = x[11]; } });
+    return { q: q0.map((v, i) => v + sig * (e[i] - v)), e, x };
+  }
+  // Peak torque (fraction of the rating) of the network's move, at five moments by central differences.
+  function peak(q0, goal, T, m) {
+    let pk = 0; const d = 0.02;
+    for (let k = 1; k <= 5; k++) {
+      const s = k / 6, a = raw(q0, goal, s - d, T).q, b = raw(q0, goal, s, T).q, c = raw(q0, goal, s + d, T).q;
+      const qd = b.map((_, i) => (c[i] - a[i]) / (2 * d * T)), qdd = b.map((v, i) => (c[i] - 2 * v + a[i]) / (d * d * T * T));
+      for (const r of torques(b, qd, qdd, m)) pk = Math.max(pk, Math.abs(r));
+    }
+    return pk;
+  }
+  // Plan a move to (tx, ty, phi): the end pose is chosen for mPose kg, torques checked with mDyn kg on board. Duration:
+  // the shortest of 1, 1.5, 2, 3 x the blend's time whose predicted peak stays within the motors (else the lowest).
+  function plan(q0, tx, ty, phi, mPose, mDyn) {
+    const goal = goalOf(tx, ty, phi, mPose), Tb = Math.max(0.15, moveTime(q0, raw(q0, goal, 1, 1).e));
+    let best = null;
+    for (const f of [1, 1.5, 2, 3]) {
+      const T = Math.max(0.15, Tb * f), pk = peak(q0, goal, T, mDyn);
+      if (!best || pk < best.peak) best = { T, f, peak: pk };
+      if (pk <= 1) { best = { T, f, peak: pk }; break; }
+    }
+    const eEnd = raw(q0, goal, 1, best.T).e;
+    let qref = refine(eEnd, tx, ty, phi, 2);
+    for (let k = 0; k < 60 && penalty(qref) > 0; k++) qref = refine(avoid(qref, 0.02), tx, ty, phi, 1);
+    const ks = Math.max(2, Math.ceil(best.T / DT));
+    return { q0: q0.slice(), goal, ...best, m: mDyn, delta: qref.map((v, i) => v - eEnd[i]), ks, dt: best.T / ks, knots: new Array(ks + 1), t: 0 };
+  }
+  function knot(m, k) {
+    if (!m.knots[k]) {
+      const s = k / m.ks, r = raw(m.q0, m.goal, s, m.T), b = bf(s), q = r.q.map((v, i) => v + b * m.delta[i]);
+      m.knots[k] = q;
+      if (rec.on) rec.mgnn = { s, T: m.T, x: r.x, e: r.e, q };
+    }
+    return m.knots[k];
+  }
+  // Joint angles at time t of a planned move: cubic Hermite through the knots, at rest at both ends.
+  function at(m, t) {
+    const u = Math.min(m.ks, t / m.dt), k = Math.min(m.ks - 1, Math.floor(u)), f = u - k;
+    const p0 = knot(m, k), p1 = knot(m, k + 1), pm = k > 0 ? knot(m, k - 1) : null, pp = k + 1 < m.ks ? knot(m, k + 2) : null;
+    const h00 = 2 * f ** 3 - 3 * f ** 2 + 1, h10 = f ** 3 - 2 * f ** 2 + f, h01 = -2 * f ** 3 + 3 * f ** 2, h11 = f ** 3 - f ** 2;
+    return p0.map((v, i) => h00 * v + h10 * (pm ? (p1[i] - pm[i]) / 2 : 0) + h01 * p1[i] + h11 * (pp ? (pp[i] - v) / 2 : 0));
+  }
+  return { plan, at, raw, eval: WM.eval };
+})();
+let motion = 'blend';
+let partSeq = 0;
+
+// ---------- state ----------
+let solver = 'gnn', mode = 'program', override = 1, partMass = A.part_mass, ikErr = 0, ikMs = 0;
+const arm = { q: null, held: null, g: 1, gTgt: 1 };
+const follow = { x: 420, y: 250, phi: PHI_DOWN };
+let blocks = [];
+const stacks = { A: [], B: [] };
+const prog = { lines: [], pc: 0, ph: null, running: !matchMedia('(prefers-reduced-motion: reduce)').matches, dir: 'AB' };
+const load = () => arm.held ? partMass : 0;
+// The payload a pose is chosen for: the part's weight while carrying it, and also while approaching it.
+const poseLoad = () => arm.held || ((mode === 'program' || mode === 'vision') && prog.lines[prog.pc] && prog.lines[prog.pc].loaded) ? partMass : 0;
+
+// Joint angles for a target. Endpoints: the GNN's pose (or a long numerical solve from the current pose),
+// refined. Tracking (straight lines, following): start from the current pose, drift toward the GNN's
+// preferred pose, then refine, so the arm never jumps but settles into the least-torque posture.
+// A GNN call takes ~9 ms in the browser, so while tracking it runs every 12th control step (20 per second)
+// and the cheap refinement keeps the tool exactly on the line in between.
+const gnnCache = { q: null, tick: 0 };
+// Recording (recordCycle below): what the networks were asked and answered on the current control step.
+const rec = { on: false, gnn: null, pinn: null, mgnn: null, look: null, qd: new Array(N).fill(0), qdd: new Array(N).fill(0) };
+function solve(tx, ty, phi, track) {
+  const t0 = performance.now(); let q;
+  if (solver === 'gnn' && track && motion === 'mgnn' && MGNN) {
+    // With the motion GNN, a line keeps the posture its last move chose: refinement alone from where the arm is. Pulling
+    // toward a network pose mid-line (the pose GNN's, or the motion GNN's own, which depends on the start pose) picks a
+    // different posture of the same reach and swings the arm across. Eight steps so each control step converges: with
+    // two, a joint held at its limit left the tool just over 1 mm off on every other step, the 30-step fallback below
+    // answered slightly differently, and the joints chattered between the two.
+    q = refine(arm.q, tx, ty, phi, 8);
+  } else if (solver === 'gnn') {
+    if (!track || !gnnCache.q || ++gnnCache.tick % 12 === 0) {
+      gnnCache.q = GNN(tx, ty, phi, poseLoad()); ikMs += (performance.now() - t0 - ikMs) * 0.3;
+      if (rec.on) rec.gnn = { x: tx, z: ty, phi, m: poseLoad(), in: [(tx - SH.x) / REACH, (ty - SH.y) / REACH, Math.sin(phi), Math.cos(phi), poseLoad() / A.payload_max], out: gnnCache.q.slice() };
+    }
+    const qg = gnnCache.q;
+    q = refine(track ? arm.q.map((v, i) => v + 0.04 * (qg[i] - v)) : qg, tx, ty, phi, 2);
+  } else { q = refine(arm.q, tx, ty, phi, track ? 2 : 40); ikMs += (performance.now() - t0 - ikMs) * 0.1; }
+  // On about 5 % of targets the GNN's pose family can only reach by crossing a joint limit, and the clamped
+  // refinement gets stuck there. Then solve numerically from the current pose and keep the closer answer.
+  const err = p => { const t = chain(p).t; return Math.hypot(t.x - tx, t.y - ty); };
+  if (solver === 'gnn' && err(q) > 1) { const qn = refine(arm.q, tx, ty, phi, 30); if (err(qn) < err(q)) q = qn; }
+  // Keep clear of the part, the bin and the floor using the spare joints, re-landing the tool after each step.
+  // Tracking nudges are small (0.002 rad per 1/240 s step): bigger ones read as torque spikes.
+  for (let k = 0; k < (track ? 1 : 60) && penalty(q) > 0; k++) q = refine(avoid(q, track ? 0.002 : 0.02), tx, ty, phi, 1);
+  const t = chain(q).t; ikErr = Math.hypot(t.x - tx, t.y - ty);
+  return q;
+}
+function moveTime(q0, q1) {
+  let T = 0;
+  for (let i = 0; i < N; i++) { const v = VMAX[i] * override, a = AMAX[i] * override, d = Math.abs(q1[i] - q0[i]); T = Math.max(T, d >= v * v / a ? d / v + v / a : 2 * Math.sqrt(d / a)); }
+  return T;
+}
+function driveJoints(h, s) {
+  for (let i = 0; i < N; i++) {
+    const vm = VMAX[i] * override, am = AMAX[i] * override, err = s.tgt[i] - s.q[i];
+    if (Math.abs(err) < 1e-5 && Math.abs(s.v[i]) < 1e-3) { s.q[i] = s.tgt[i]; s.v[i] = 0; continue; }
+    const vdes = Math.sign(err) * Math.min(vm, Math.sqrt(2 * am * Math.abs(err)) * 0.98);
+    s.v[i] += clamp(vdes - s.v[i], -am * h, am * h);
+    const nq = s.q[i] + s.v[i] * h;
+    if ((s.tgt[i] - nq) * err < 0) { s.q[i] = s.tgt[i]; s.v[i] = 0; } else s.q[i] = nq;
+  }
+}
+const settled = s => s.q.every((q, i) => Math.abs(s.tgt[i] - q) < 0.001 && Math.abs(s.v[i]) < 0.005);
+
+// ---------- parts and gripper ----------
+const GC = (BS / 2 - 12) / 43;
+function resetCell() {
+  arm.held = null; blocks = [1, 2, 3].map((n, i) => ({ id: n, x: STN.A, y: BS / 2 + i * BS, ang: 0, vy: 0 }));
+  stacks.A = blocks.slice(); stacks.B = []; prog.dir = 'AB'; buildTransfer();
+}
+function updateGrip(h) {
+  const g0 = arm.g, rate = 2.4 * override; let g1 = g0 + clamp(arm.gTgt - g0, -rate * h, rate * h);
+  const t = chain(arm.q).t;
+  if (arm.held) { if (arm.gTgt > GC + 0.02) { const b = arm.held; arm.held = null; b.ang = 0; b.vy = 0; } else g1 = Math.max(g1, GC); }
+  else if (g0 >= GC && g1 < GC) { const b = blocks.find(b => Math.abs(b.vy) < 1 && Math.hypot(b.x - t.x, b.y - t.y) < 22); if (b) { arm.held = b; g1 = GC; } }
+  arm.g = g1;
+  if (arm.held) { const c = chain(arm.q); arm.held.x = c.t.x; arm.held.y = c.t.y; arm.held.ang = c.phi + 90 * D; }
+}
+function updateBlocks(h) {
+  for (const b of blocks.filter(b => b !== arm.held).sort((a, b) => a.y - b.y)) {
+    let top = 0;
+    for (const o of blocks) if (o !== b && o !== arm.held && Math.abs(o.x - b.x) < BS * 0.9 && o.y < b.y - 1) top = Math.max(top, o.y + BS / 2);
+    const rest = top + BS / 2;
+    if (b.y > rest + 0.01) { b.vy -= 9810 * h; b.y += b.vy * h; if (b.y <= rest) { b.y = rest; b.vy = 0; } } else { b.y = Math.max(b.y, rest); b.vy = 0; }
+  }
+}
+
+// ---------- program: move the top part from one station to the other ----------
+function buildTransfer() {
+  if (prog.dir === 'AB' && !stacks.A.length) prog.dir = 'BA'; else if (prog.dir === 'BA' && !stacks.B.length) prog.dir = 'AB';
+  const s = prog.dir[0], d = prog.dir[1], k = stacks[s].length - 1, m = stacks[d].length;
+  const zG = k * BS + BS / 2, zP = m * BS + BS / 2 + 2;
+  prog.lines = [
+    { op: 'GRIP', open: true, name: 'open gripper' },
+    { op: 'PTP', x: STN[s], z: SAFE, name: `above ${s}` },
+    { op: 'LIN', x: STN[s], z: zG, v: 250, name: `pick from ${s}` },
+    { op: 'GRIP', open: false, name: 'close gripper' },
+    { op: 'LIN', x: STN[s], z: SAFE, v: 400, name: `lift from ${s}` },
+    { op: 'PTP', x: STN[d], z: SAFE, name: `above ${d}` },
+    { op: 'LIN', x: STN[d], z: zP, v: 250, name: `place on ${d}` },
+    { op: 'GRIP', open: true, name: 'release' },
+    { op: 'LIN', x: STN[d], z: SAFE, v: 400, name: `back up from ${d}` },
+  ];
+  prog.src = s; prog.dst = d; prog.pc = 0; prog.ph = null; prog.kind = 'xfer';
+}
+
+// ---------- vision pick: the camera finds the part, the arm drops it in the bin ----------
+function spawnPart() {
+  partSeq++;
+  blocks.push({ id: partSeq, x: Math.round(PART.min + Math.random() * (PART.max - PART.min)), y: BS / 2, ang: 0, vy: 0, color: PART_COLORS[(partSeq - 1) % PART_COLORS.length] });
+}
+function resetVision() {
+  arm.held = null; blocks = []; partSeq = 0; vis.det = null; vis.err = null; vis.missed = 0; vis.binned = 0;
+  camCx.clearRect(0, 0, camEl.width, camEl.height); $('v-note').textContent = 'Waiting for the first look.';
+  spawnPart(); buildVision();
+}
+// Park over the bin, clear of the camera's view, then look. `from`: back straight up out of a missed grip first.
+function buildVision(from) {
+  prog.lines = [...(from ? [{ op: 'LIN', x: Math.round(from.x), z: SAFE, v: 400, name: 'back off' }] : []),
+    { op: 'PTP', x: BIN.x, z: BIN.drop, name: 'park over the bin' }, { op: 'LOOK', name: 'look with the camera' }];
+  prog.pc = 0; prog.ph = null; prog.kind = 'vision';
+}
+function look() {
+  const img = VISION.capture(), t0 = performance.now(), d = VISION.forward(img);
+  vis.ms = performance.now() - t0; vis.img = img; vis.det = d;
+  const part = blocks.find(b => b !== arm.held); vis.err = part ? Math.hypot(d.x - part.x, d.z - part.y) : null;
+  if (rec.on) rec.look = { det: d, part: part ? { x: part.x, z: part.y } : null, img, ms: vis.ms };
+  drawCam();
+  const x = clamp(Math.round(d.x), PART.min - 20, PART.max + 20), z = Math.max(Math.round(d.z), BS / 2);
+  prog.lines = prog.lines.slice(0, prog.pc + 1).concat([
+    // Approach already in the pose for carrying the part's weight, so gripping it doesn't make the arm
+    // swing into a different posture (through the part) on the way back up.
+    { op: 'GRIP', open: true, name: 'open gripper' }, { op: 'PTP', x, z: SAFE, name: 'above the part', loaded: true },
+    { op: 'LIN', x, z, v: 250, name: 'down to the part', loaded: true }, { op: 'GRIP', open: false, name: 'close gripper' },
+    { op: 'LIN', x, z: SAFE, v: 400, name: 'lift' },
+    // With the PINN the carry is one physics-shaped joint move that it learned to keep clear of the part;
+    // with the joint blend it takes the fixed route over the top, since a blend would pass through the arm.
+    ...((motion === 'pinn' && PINN5) || (motion === 'mgnn' && MGNN)
+      ? [{ op: 'PTP', x: BIN.x, z: BIN.drop, name: `carry to the bin (${motion === 'pinn' ? 'PINN' : 'motion GNN'})` }]
+      : overTheTop({ x, z: SAFE, phi: PHI_DOWN }, { x: BIN.x, z: BIN.drop, phi: PHI_DOWN })),
+    { op: 'GRIP', open: true, name: 'drop in the bin' }]);
+}
+// The part may not pass through the arm, so it goes over the top: tilt the tool out until it points away
+// from the shoulder on a circle around it (every link is then between the shoulder and the part), swing
+// along that circle to the other side, then tilt back down over the target. Tool angles are unwrapped
+// so the tool turns the short, continuous way.
+const ARC_R = 640, ARC_FROM = 30 * D, ARC_TO = 150 * D;
+function overTheTop(from, to) {
+  const onArc = a => ({ x: SH.x + ARC_R * Math.cos(a), z: SH.y + ARC_R * Math.sin(a), phi: a });
+  const a0 = onArc(ARC_FROM), a1 = onArc(ARC_TO), toPhi = to.phi + 2 * Math.PI;   // -90° reached by turning on through 180°
+  return [
+    { op: 'MOVE', name: 'tilt out', v: 300, ...line(from, a0) },
+    { op: 'MOVE', name: 'over the top', v: 350, at: f => onArc(ARC_FROM + (ARC_TO - ARC_FROM) * f), L: ARC_R * (ARC_TO - ARC_FROM) },
+    { op: 'MOVE', name: 'tilt in over the bin', v: 300, ...line(a1, { ...to, phi: toPhi }) },
+  ];
+}
+// A straight tool-point path with the tool angle turning evenly; turning counts as 300 mm per radian.
+function line(a, b) {
+  return { at: f => ({ x: a.x + (b.x - a.x) * f, z: a.z + (b.z - a.z) * f, phi: a.phi + (b.phi - a.phi) * f }),
+           L: Math.hypot(b.x - a.x, b.z - a.z) + 300 * Math.abs(b.phi - a.phi) };
+}
+// Closest the carried part comes to the arm's links (the gripper's own link excluded) or the base, in mm.
+function partClearance() {
+  if (!arm.held) return Infinity;
+  const c = chain(arm.q), pr = BS / Math.SQRT2, p = c.t;
+  const seg = (a, b) => { const dx = b.x - a.x, dy = b.y - a.y, t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+    return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy); };
+  let m = Infinity;
+  for (let i = 0; i < N - 1; i++) m = Math.min(m, seg(c.p[i], c.p[i + 1]) - LINK_R[i] - pr);
+  for (let i = 0; i < N - 1; i++) m = Math.min(m, Math.hypot(p.x - c.p[i].x, p.y - c.p[i].y) - JOINT_R[i] - pr);
+  const bx = clamp(p.x, -80, 80), by = clamp(p.y, 0, SH.y - 30);   // the base, as a box
+  return Math.min(m, Math.hypot(p.x - bx, p.y - by) - pr);
+}
+function updateBin() {
+  for (const b of blocks.filter(b => b !== arm.held && b.vy === 0 && b.y < BIN.h && Math.abs(b.x - BIN.x) < BIN.w / 2)) { blocks.splice(blocks.indexOf(b), 1); vis.binned++; }
+  if (!blocks.length) spawnPart();
+}
+const camEl = $('cam'), camCx = camEl.getContext('2d'), camSmall = document.createElement('canvas');
+function drawCam() {
+  const c = VISION.cam, n = c.w * c.h, im = new ImageData(c.w, c.h);
+  for (let k = 0; k < n; k++) { im.data[4 * k] = vis.img[k] * 255; im.data[4 * k + 1] = vis.img[n + k] * 255; im.data[4 * k + 2] = vis.img[2 * n + k] * 255; im.data[4 * k + 3] = 255; }
+  camSmall.width = c.w; camSmall.height = c.h; camSmall.getContext('2d').putImageData(im, 0, 0);
+  camCx.imageSmoothingEnabled = false; camCx.drawImage(camSmall, 0, 0, camEl.width, camEl.height);
+  const X = (vis.det.x - c.x0) / (c.x1 - c.x0) * camEl.width, Y = (c.z1 - vis.det.z) / (c.z1 - c.z0) * camEl.height;
+  for (const [col, lw] of [['#ffffff', 5], ['#d6202a', 2.5]]) { camCx.strokeStyle = col; camCx.lineWidth = lw; camCx.beginPath(); camCx.arc(X, Y, 16, 0, 7);
+    camCx.moveTo(X - 28, Y); camCx.lineTo(X - 8, Y); camCx.moveTo(X + 8, Y); camCx.lineTo(X + 28, Y); camCx.moveTo(X, Y - 28); camCx.lineTo(X, Y - 8); camCx.moveTo(X, Y + 8); camCx.lineTo(X, Y + 28); camCx.stroke(); }
+  $('v-note').textContent = `Found the part at X ${Math.round(vis.det.x)}, Z ${Math.round(vis.det.z)} mm` + (vis.err == null ? '.' : `, ${vis.err.toFixed(1)} mm from its true centre (${vis.ms.toFixed(0)} ms).`);
+}
+function stepProgram(h) {
+  if (!prog.running) return;
+  const ln = prog.lines[prog.pc];
+  if (!prog.ph) {
+    const ph = {};
+    if (ln.op === 'PTP' && motion === 'mgnn' && MGNN) ph.mg = MGNN.plan(arm.q, ln.x, ln.z, PHI_DOWN, poseLoad(), load());
+    else if (ln.op === 'PTP') {
+      const tgt = solve(ln.x, ln.z, PHI_DOWN, false); ph.plan = { q: arm.q.slice(), v: new Array(N).fill(0), tgt };
+      const Tb = moveTime(arm.q, tgt);
+      if (motion === 'pinn' && PINN5 && Tb >= 0.15) {   // moves shorter than that stay a blend: too short to shape
+        const d = PINN5.duration(arm.q, tgt, Tb, load());
+        ph.pinn = { q0: arm.q.slice(), q1: tgt, T: d.T, f: d.f, peak: d.peak, m: load(), t: 0 };
+      }
+    }
+    else if (ln.op === 'LIN') { const t = chain(arm.q).t; Object.assign(ph, { x0: t.x, z0: t.y, L: Math.hypot(ln.x - t.x, ln.z - t.y), s: 0, v: 0 }); }
+    else if (ln.op === 'LOOK') ph.t = 0;
+    else if (ln.op === 'MOVE') Object.assign(ph, { s: 0, v: 0 });
+    else { arm.gTgt = ln.open ? 1 : 0; ph.t = 0; }
+    prog.ph = ph; peak.cur = new Array(N).fill(0);
+  }
+  const ph = prog.ph; let done = false;
+  if (ln.op === 'PTP' && ph.mg) {
+    const m = ph.mg; m.t = Math.min(m.T, m.t + h); arm.q = MGNN.at(m, m.t); done = m.t >= m.T;
+  } else if (ln.op === 'PTP' && ph.pinn) {
+    const m = ph.pinn, info = rec.on ? {} : null; m.t = Math.min(m.T, m.t + h); arm.q = PINN5.at(m.q0, m.q1, m.t / m.T, m.T, m.m, info); done = m.t >= m.T;
+    if (info) rec.pinn = { ...info, s: m.t / m.T, T: m.T, m: m.m };
+  } else if (ln.op === 'PTP') { driveJoints(h, ph.plan); arm.q = ph.plan.q.slice(); done = settled(ph.plan); }
+  else if (ln.op === 'LIN') {
+    const vmax = ln.v * override, a = 1200 * override, rem = ph.L - ph.s;
+    ph.v += clamp(Math.min(vmax, Math.sqrt(2 * a * Math.max(rem, 0))) - ph.v, -a * h, a * h);
+    ph.s = Math.min(ph.L, ph.s + Math.max(ph.v, 2) * h);
+    const f = ph.L > 0 ? ph.s / ph.L : 1;
+    arm.q = solve(ph.x0 + (ln.x - ph.x0) * f, ph.z0 + (ln.z - ph.z0) * f, PHI_DOWN, true);
+    done = ph.s >= ph.L;
+  } else if (ln.op === 'MOVE') {
+    const vmax = ln.v * override, a = 1200 * override, rem = ln.L - ph.s;
+    ph.v += clamp(Math.min(vmax, Math.sqrt(2 * a * Math.max(rem, 0))) - ph.v, -a * h, a * h);
+    ph.s = Math.min(ln.L, ph.s + Math.max(ph.v, 2) * h);
+    const p = ln.at(ln.L > 0 ? ph.s / ln.L : 1);
+    arm.q = solve(p.x, p.z, p.phi, true);
+    done = ph.s >= ln.L;
+  } else if (ln.op === 'LOOK') {
+    ph.t += h;   // let a falling part land before taking the picture
+    if (ph.t > 0.3 && blocks.every(b => b === arm.held || b.vy === 0)) { look(); done = true; }
+  } else { ph.t += h; done = ph.t > 0.12 && (ln.open ? arm.g >= 0.999 : (!!arm.held || arm.g <= 0.001)); }
+  if (!done) return;
+  peak.last = peak.cur.slice(); peak.lastName = ln.name;
+  if (prog.kind === 'vision' && ln.op === 'GRIP' && !ln.open && !arm.held) { vis.missed++; buildVision(chain(arm.q).t); return; }
+  if (prog.kind === 'xfer' && ln.op === 'GRIP' && !ln.open && arm.held) { const st = stacks[prog.src], i = st.indexOf(arm.held); if (i >= 0) st.splice(i, 1); prog.carried = arm.held; }
+  if (prog.kind === 'xfer' && ln.op === 'GRIP' && ln.open && prog.carried && !arm.held) { stacks[prog.dst].push(prog.carried); prog.carried = null; }
+  prog.ph = null; prog.pc++;
+  if (prog.pc >= prog.lines.length) { if (prog.kind === 'vision') buildVision(); else buildTransfer(); }
+}
+
+// ---------- torque tracking ----------
+const peak = { cur: new Array(N).fill(0), last: null, lastName: '' };
+const hist = [], TRN = 240; let qh = [], tq = new Array(N).fill(0), sampleT = 0;
+// Largest |torque| each joint has needed (N·m) and the program step it happened in, since the mode was set or reset.
+const maxObs = { nm: new Array(N).fill(0), where: new Array(N).fill('') };
+function resetMaxObs() { maxObs.nm.fill(0); maxObs.where.fill(''); }
+function trackTorque(h) {
+  qh.push(arm.q.slice()); if (qh.length > 3) qh.shift();
+  if (qh.length < 3) return;
+  const [a, b, c] = qh, qd = c.map((v, i) => (v - b[i]) / h), qdd = c.map((v, i) => (v - 2 * b[i] + a[i]) / (h * h));
+  tq = torques(c, qd, qdd, load()); rec.qd = qd; rec.qdd = qdd;
+  tq.forEach((r, j) => { peak.cur[j] = Math.max(peak.cur[j], Math.abs(r));
+    const nm = Math.abs(r) * A.tau_max[j];
+    if (nm > maxObs.nm[j]) { maxObs.nm[j] = nm; maxObs.where[j] = runs(mode) && prog.lines[prog.pc] ? prog.lines[prog.pc].name : 'following'; } });
+}
+
+// ---------- UI ----------
+const HINTS = {
+  program: 'Moves parts between stations A and B. Joint moves go to the solver\'s pose; straight moves track the line and, with the GNN, settle into its least-torque posture.',
+  follow: 'Move the pointer to steer the tool. Scroll or use the slider to tilt it. Click to grip or release a part.',
+  vision: 'A camera images the floor and the vision network finds the part; the arm picks it and drops it in the bin. Click the floor to move the part.',
+};
+const cellWrap = $('cellWrap'), MODES = ['program', 'follow', 'vision'];
+const runs = m => m === 'program' || m === 'vision';
+function setMode(m) {
+  mode = m; MODES.forEach(k => $('m-' + k).setAttribute('aria-pressed', k === m));
+  selfMin = { gap: Infinity, who: '' }; resetMaxObs();
+  $('prog-ctl').hidden = !runs(m); $('step').hidden = !runs(m); $('phi-ctl').hidden = m !== 'follow'; $('g-vision').hidden = m !== 'vision';
+  cellWrap.classList.toggle('follow', m === 'follow'); cellWrap.classList.toggle('pick', m === 'vision'); $('hint').textContent = HINTS[m];
+  if (m === 'program') resetCell();
+  else if (m === 'vision') resetVision();
+  else { const c = chain(arm.q); follow.x = c.t.x; follow.y = c.t.y; follow.phi = wrapPi(c.phi); syncPhi(); prog.ph = null; }
+}
+function setSolver(s) {
+  solver = s; $('s-gnn').setAttribute('aria-pressed', s === 'gnn'); $('s-num').setAttribute('aria-pressed', s === 'num');
+  $('s-note').textContent = s === 'gnn'
+    ? 'A graph network picks, for each target and payload, the pose needing the least motor torque to hold; two damped-least-squares steps then land it exactly. It learned from the least-torque poses a 64-start search found for a million targets, plus reach, gravity and limit terms.'
+    : 'Damped least squares from the current pose: reaches the target but ignores gravity, so the arm can end up holding the part in a costly pose.';
+}
+function syncPhi() { $('phi').value = Math.round(follow.phi / D); $('phi-o').textContent = fmtDeg(follow.phi); }
+MODES.forEach(k => $('m-' + k).addEventListener('click', () => setMode(k)));
+if (!VISION) { $('m-vision').disabled = true; $('m-vision').title = 'Needs vision-weights.js next to this page'; }
+$('s-gnn').addEventListener('click', () => setSolver('gnn')); $('s-num').addEventListener('click', () => setSolver('num'));
+function setMotion(m) {
+  motion = m; for (const k of ['blend', 'pinn', 'mgnn']) $('mo-' + k).setAttribute('aria-pressed', k === m);
+  $('mo-note').textContent = m === 'pinn'
+    ? 'A physics-informed network shapes each joint move from the equations of motion, for low effort and low peak torque, clear of the floor, the bin and the carried part. Each move gets the shortest of 1–3× the blend\'s duration whose predicted peak stays within the motor limits. The carry to the bin is one such move.'
+    : m === 'mgnn'
+    ? 'One graph network does both jobs: given the start pose, the target, the payload, the duration and a moment, it gives the joint angles at that moment, trained on the pose loss at the end and the physics loss along the way. It is asked 20 times a second for the next moment and blended in between. The carry to the bin is one such move.'
+    : 'Each joint speeds up and slows down on its own at its limits. The carry to the bin takes a fixed route over the top, tracked by the IK.';
+}
+$('mo-blend').addEventListener('click', () => setMotion('blend')); $('mo-pinn').addEventListener('click', () => setMotion('pinn'));
+$('mo-mgnn').addEventListener('click', () => setMotion('mgnn'));
+if (!MGNN) { $('mo-mgnn').disabled = true; $('mo-mgnn').title = 'Needs arm5-mgnn-weights.js next to this page'; }
+if (!PINN5) { $('mo-pinn').disabled = true; $('mo-pinn').title = 'Needs arm5-pinn-weights.js next to this page'; }
+setMotion('blend');
+$('run').addEventListener('click', () => { prog.running = !prog.running; $('run').textContent = prog.running ? 'Pause' : 'Run'; });
+$('reset').addEventListener('click', () => { resetMaxObs(); if (mode === 'vision') resetVision(); else resetCell(); });
+// Part weight: any mass from 0 kg up. The networks were trained and the motors sized for 0-12 kg; heavier parts
+// still run on the same networks (no fallback), so the torque readouts show what the motors would have to give.
+function weightNote() { $('pm-o').textContent = partMass > A.payload_max ? `beyond training and motor sizing (0–${A.payload_max} kg)` : ''; }
+$('pm').addEventListener('input', e => { const v = parseFloat(e.target.value); if (Number.isFinite(v) && v >= 0) { partMass = v; weightNote(); } });
+$('pm').addEventListener('change', e => { e.target.value = partMass; });
+$('ov').addEventListener('input', e => { override = e.target.value / 100; $('ov-o').textContent = e.target.value + ' %'; });
+$('phi').addEventListener('input', e => { follow.phi = e.target.value * D; syncPhi(); });
+$('legend').innerHTML = Array.from({ length: N }, (_, i) => `<span><i style="background:var(--q${i + 1})"></i>A${i + 1}</span>`).join('');
+
+// ---------- drawing ----------
+const cv = $('cell'), cx = cv.getContext('2d'), tv = $('trace'), tx = tv.getContext('2d');
+let VW = 0, VH = 0, sc = 1, ox = 0, oy = 0, dpr = 1, TW = 0, TH = 0;
+function fit() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const r = cv.getBoundingClientRect(); VW = r.width; VH = r.height; cv.width = Math.round(VW * dpr); cv.height = Math.round(VH * dpr);
+  sc = Math.min((VW - 16) / 1120, (VH - 50) / 860); ox = (VW - 1120 * sc) / 2 + 300 * sc; oy = VH - 42;
+  const t = tv.getBoundingClientRect(); TW = t.width; TH = t.height; tv.width = Math.round(TW * dpr); tv.height = Math.round(TH * dpr);
+}
+new ResizeObserver(fit).observe(cellWrap); new ResizeObserver(fit).observe(tv);
+const S = p => [ox + p.x * sc, oy - p.y * sc];
+let C = {};
+function readTokens() { const cs = getComputedStyle(document.documentElement);
+  ['panel', 'fg', 'muted', 'grid', 'arm', 'arm-edge', 'joint', 'steel', 'block', 'block-edge', 'pad', 'alert', 'live', 'q1', 'q2', 'q3', 'q4', 'q5'].forEach(n => C[n] = cs.getPropertyValue('--' + n).trim()); }
+readTokens();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readTokens);
+new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+const MONO = '"JetBrains Mono", ui-monospace, monospace', DISP = '"Barlow Condensed", "Arial Narrow", sans-serif';
+function draw() {
+  if (VW < 40 || VH < 80) return;
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.fillStyle = C.panel; cx.fillRect(0, 0, VW, VH);
+  cx.strokeStyle = C.grid; cx.lineWidth = 1;
+  for (let x = -300; x <= 820; x += 100) { const [X] = S({ x, y: 0 }); cx.beginPath(); cx.moveTo(X + .5, 0); cx.lineTo(X + .5, oy); cx.stroke(); }
+  for (let z = 100; oy - z * sc > 0; z += 100) { const [, Y] = S({ x: 0, y: z }); cx.beginPath(); cx.moveTo(0, Y + .5); cx.lineTo(VW, Y + .5); cx.stroke(); }
+  cx.fillStyle = C.muted; cx.font = `10px ${MONO}`; cx.textAlign = 'center'; cx.textBaseline = 'top';
+  for (let x = -200; x <= 800; x += 100) { const [X] = S({ x, y: 0 }); cx.fillText(x, X, oy + 24); }
+  cx.strokeStyle = C.fg; cx.lineWidth = 1.5; cx.beginPath(); cx.moveTo(0, oy); cx.lineTo(VW, oy); cx.stroke();
+  if (mode !== 'vision') for (const k of ['A', 'B']) { const [X] = S({ x: STN[k], y: 0 }); cx.fillStyle = C.pad; cx.fillRect(X - 50 * sc, oy - 3, 100 * sc, 3);
+    cx.fillStyle = C.fg; cx.font = `600 12px ${DISP}`; cx.textAlign = 'center'; cx.textBaseline = 'top'; cx.fillText('STN ' + k, X, oy + 8); }
+  if (mode === 'vision' && VISION) {
+    const cm = VISION.cam, [x0, y0] = S({ x: cm.x0, y: cm.z1 }), [x1, y1] = S({ x: cm.x1, y: 0 });
+    cx.strokeStyle = C.muted; cx.lineWidth = 1; cx.setLineDash([4, 4]); cx.strokeRect(x0 + .5, y0 + .5, x1 - x0, y1 - y0); cx.setLineDash([]);
+    cx.fillStyle = C.muted; cx.font = `10px ${MONO}`; cx.textAlign = 'left'; cx.textBaseline = 'bottom'; cx.fillText('CAMERA VIEW', x0 + 4, y0 - 3);
+  }
+  for (const b of blocks) { const [X, Y] = S(b), s = BS * sc; cx.save(); cx.translate(X, Y); cx.rotate(-b.ang);
+    cx.fillStyle = b.color || C.block; cx.strokeStyle = C['block-edge']; cx.lineWidth = 1.2; cx.fillRect(-s / 2, -s / 2, s, s); cx.strokeRect(-s / 2, -s / 2, s, s);
+    cx.fillStyle = '#ffffff'; cx.font = `500 ${Math.max(8, Math.round(15 * sc))}px ${MONO}`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText(b === arm.held ? partMass + 'kg' : b.id, 0, 1); cx.restore(); }
+  if (mode === 'vision') {   // bin, drawn over the parts so the ones inside are hidden
+    const hw = BIN.w / 2; cx.beginPath(); [[-hw + 8, 0], [hw - 8, 0], [hw, BIN.h], [-hw, BIN.h]].map(([a, b]) => S({ x: BIN.x + a, y: b })).forEach(([X, Y], i) => i ? cx.lineTo(X, Y) : cx.moveTo(X, Y));
+    cx.closePath(); cx.fillStyle = C.steel; cx.fill(); cx.strokeStyle = C.joint; cx.lineWidth = 1.5; cx.stroke();
+    const [X] = S({ x: BIN.x, y: 0 }); cx.fillStyle = C.fg; cx.font = `600 12px ${DISP}`; cx.textAlign = 'center'; cx.textBaseline = 'top'; cx.fillText(`BIN · ${vis.binned}`, X, oy + 8);
+    if (vis.det) { const [DX, DY] = S({ x: vis.det.x, y: vis.det.z }); cx.strokeStyle = C.live; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(DX, DY, 9, 0, 7);
+      cx.moveTo(DX - 15, DY); cx.lineTo(DX - 5, DY); cx.moveTo(DX + 5, DY); cx.lineTo(DX + 15, DY); cx.moveTo(DX, DY - 15); cx.lineTo(DX, DY - 5); cx.moveTo(DX, DY + 5); cx.lineTo(DX, DY + 15); cx.stroke();
+      cx.fillStyle = C.live; cx.font = `500 11px ${MONO}`; cx.textAlign = 'center'; cx.textBaseline = 'bottom'; cx.fillText('found', DX, DY - 18); }
+  }
+  // base
+  cx.fillStyle = C.joint; cx.beginPath(); [[-80, 0], [80, 0], [52, SH.y - 30], [-52, SH.y - 30]].map(([a, b]) => S({ x: a, y: b })).forEach(([X, Y], i) => i ? cx.lineTo(X, Y) : cx.moveTo(X, Y)); cx.fill();
+  // arm: links taper toward the tool; a joint is ringed red while its motor is past its limit
+  const c = chain(arm.q), widths = [58, 48, 40, 32];
+  cx.lineCap = 'round';
+  for (let i = 0; i < N - 1; i++) {
+    cx.strokeStyle = C['arm-edge']; cx.lineWidth = widths[i] * sc + 2; cx.beginPath(); cx.moveTo(...S(c.p[i])); cx.lineTo(...S(c.p[i + 1])); cx.stroke();
+    cx.strokeStyle = C.arm; cx.lineWidth = widths[i] * sc; cx.stroke();
+  }
+  const w = c.p[N - 1], u = { x: Math.cos(c.phi), y: Math.sin(c.phi) }, n = { x: -u.y, y: u.x }, half = 12 + 43 * arm.g, L5 = LEN[N - 1];
+  const P = (a, b) => ({ x: w.x + u.x * a + n.x * b, y: w.y + u.y * a + n.y * b });
+  cx.strokeStyle = C.joint; cx.lineWidth = 26 * sc; cx.beginPath(); cx.moveTo(...S(w)); cx.lineTo(...S(P(L5 - 68, 0))); cx.stroke();
+  cx.lineWidth = 20 * sc; cx.beginPath(); cx.moveTo(...S(P(L5 - 62, -64))); cx.lineTo(...S(P(L5 - 62, 64))); cx.stroke();
+  cx.strokeStyle = C.steel; cx.lineWidth = 12 * sc;
+  for (const sg of [-1, 1]) { cx.beginPath(); cx.moveTo(...S(P(L5 - 50, sg * (half + 6)))); cx.lineTo(...S(P(L5 + 12, sg * (half + 6)))); cx.stroke(); }
+  const radii = [44, 36, 30, 25, 21];
+  for (let i = 0; i < N; i++) {
+    const [X, Y] = S(c.p[i]), bad = Math.abs(tq[i]) > 1;
+    cx.fillStyle = C.joint; cx.beginPath(); cx.arc(X, Y, radii[i] * sc, 0, 7); cx.fill();
+    cx.strokeStyle = bad ? C.alert : C.arm; cx.lineWidth = bad ? 3 : 1.5; cx.beginPath(); cx.arc(X, Y, Math.max(1, (radii[i] - 9) * sc), 0, 7); cx.stroke();
+    cx.fillStyle = C.muted; cx.font = `10px ${MONO}`; cx.textAlign = 'left'; cx.textBaseline = 'bottom'; cx.fillText('A' + (i + 1), X + radii[i] * sc + 2, Y - 2);
+  }
+  { const [X, Y] = S(c.t); cx.strokeStyle = C.alert; cx.lineWidth = 1.2; cx.beginPath(); cx.moveTo(X - 5, Y); cx.lineTo(X + 5, Y); cx.moveTo(X, Y - 5); cx.lineTo(X, Y + 5); cx.stroke(); }
+  const low = Math.min(...c.p.slice(1).map(p => p.y));
+  { const sn = selfClearance(arm.q);
+    if (sn.gap < 0) { cx.fillStyle = C.alert; cx.font = `500 12px ${MONO}`; cx.textAlign = 'right'; cx.textBaseline = 'top'; cx.fillText(`self-collision: ${sn.who}, ${Math.round(-sn.gap)} mm`, VW - 10, VH - 18); } }
+  if (low < 0) { cx.fillStyle = C.alert; cx.font = `500 12px ${MONO}`; cx.textAlign = 'left'; cx.textBaseline = 'top'; cx.fillText(`into the floor ${Math.round(-low)} mm`, 10, VH - 18); }
+  if (mode === 'follow') { const [X, Y] = S(follow); cx.strokeStyle = C.live; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(X, Y, 11, 0, 7);
+    cx.moveTo(X - 18, Y); cx.lineTo(X - 6, Y); cx.moveTo(X + 6, Y); cx.lineTo(X + 18, Y); cx.moveTo(X, Y - 18); cx.lineTo(X, Y - 6); cx.moveTo(X, Y + 6); cx.lineTo(X, Y + 18); cx.stroke(); }
+}
+function drawTrace() {
+  if (TW < 60) return;
+  const g = tx; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, TW, TH);
+  const m = hist.reduce((a, r) => Math.max(a, ...r.map(Math.abs)), 0), hi = Math.max(150, Math.ceil(m / 50) * 50);
+  const L = 40, T = 6, B = 16, pw = TW - L - 8, ph = TH - T - B, y = v => T + (hi - v) / (2 * hi) * ph;
+  g.font = `10px ${MONO}`; g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (const v of [-hi, -100, 0, 100, hi]) {
+    const lim = Math.abs(v) === 100; g.strokeStyle = lim ? C.alert : C.grid; g.globalAlpha = lim ? .7 : 1; g.setLineDash(lim ? [4, 4] : []);
+    g.beginPath(); g.moveTo(L, Math.round(y(v)) + .5); g.lineTo(L + pw, Math.round(y(v)) + .5); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+    g.fillStyle = lim ? C.alert : C.muted; g.fillText((v < 0 ? '−' : '') + Math.abs(v), L - 6, y(v));
+  }
+  g.fillStyle = C.muted; g.textBaseline = 'top'; g.textAlign = 'left'; g.fillText('−8 s', L, T + ph + 3); g.textAlign = 'right'; g.fillText('now', L + pw, T + ph + 3);
+  const off = TRN - hist.length;
+  for (let j = 0; j < N; j++) { g.strokeStyle = C['q' + (j + 1)]; g.lineWidth = 1.6; g.lineJoin = 'round'; g.beginPath();
+    hist.forEach((r, i) => { const X = L + (off + i) / (TRN - 1) * pw, Y = y(clamp(r[j], -hi, hi)); i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.stroke(); }
+}
+function tele() {
+  const c = chain(arm.q), pct = r => Math.round(Math.abs(r) * 100), hold = holding(arm.q, load());
+  $('t-q').textContent = arm.q.map(fmtDeg).join(' · ');
+  $('t-xz').textContent = `${Math.round(c.t.x)} · ${Math.round(c.t.y)} mm`; $('t-phi').textContent = fmtDeg(wrapPi(c.phi));
+  $('t-ike').textContent = ikErr.toFixed(2) + ' mm'; $('t-ikt').textContent = ikMs.toFixed(1) + ' ms';
+  $('t-hold').textContent = hold.map(pct).join(' · ') + ' %'; $('t-hold').classList.toggle('warn', hold.some(r => Math.abs(r) > 1));
+  $('t-tq').textContent = tq.map(pct).join(' · ') + ' %'; $('t-tq').classList.toggle('warn', tq.some(r => Math.abs(r) > 1));
+  $('t-tp').textContent = peak.last ? peak.last.map(pct).join(' · ') + ' %' : '–'; $('t-tp').classList.toggle('warn', !!peak.last && peak.last.some(v => v > 1));
+  const mx = $('t-max'), any = maxObs.nm.some(v => v > 0);
+  mx.textContent = any ? maxObs.nm.map(v => v.toFixed(1)).join(' · ') + ' N·m' : '–';
+  mx.title = any ? maxObs.nm.map((v, j) => `A${j + 1}: ${v.toFixed(1)} N·m = ${Math.round(v * 100 / A.tau_max[j])} % of its ${A.tau_max[j]} N·m motor, during "${maxObs.where[j]}"`).join('\n') : '';
+  mx.classList.toggle('warn', maxObs.nm.some((v, j) => v > A.tau_max[j]));
+  $('t-eff').textContent = hold.reduce((a, r) => a + r * r, 0).toFixed(3);
+  $('t-g').textContent = arm.held ? `holding ${partMass} kg` : (arm.g > 0.98 ? 'open' : arm.g < 0.02 ? 'closed' : Math.round(arm.g * 100) + ' %');
+  if (runs(mode)) {
+    const ln = prog.lines[prog.pc], pm = prog.ph && (prog.ph.pinn || prog.ph.mg);
+    $('step').textContent = ln ? `Step ${prog.pc + 1} of ${prog.lines.length}: ${ln.name}` + (pm ? ` · ${prog.ph.mg ? 'motion GNN' : 'PINN'}, ${pm.T.toFixed(1)} s (${pm.f}× the blend's time), predicted peak ${Math.round(pm.peak * 100)} %` : '') : '–';
+  }
+  if (mode === 'vision') $('v-count').textContent = `${vis.binned} binned · ${vis.missed} missed`;
+  const cl = clear.cur < Infinity ? clear.cur : clear.last;
+  $('t-clr').textContent = cl == null ? '–' : cl < 0 ? `${Math.round(-cl)} mm inside the arm` : `${Math.round(cl)} mm`;
+  $('t-clr').classList.toggle('warn', cl != null && cl < 0);
+  const sn = selfClearance(arm.q), fmtGap = g => g < 0 ? `${Math.round(-g)} mm overlap` : `${Math.round(g)} mm`;
+  $('t-self').textContent = `${fmtGap(sn.gap)} (${sn.who}) · ${selfMin.gap < Infinity ? `${fmtGap(selfMin.gap)} (${selfMin.who})` : '–'}`;
+  $('t-self').classList.toggle('warn', sn.gap < 0 || selfMin.gap < 0);
+  const pill = $('pill');
+  if (runs(mode)) { pill.dataset.s = prog.running ? 'run' : 'pause'; pill.textContent = prog.running ? (mode === 'vision' ? 'RUN · VISION' : 'RUN · AUTO') : 'PAUSED'; }
+  else { pill.dataset.s = 'live'; pill.textContent = 'FOLLOW'; }
+}
+
+// ---------- pointer (follow) ----------
+function setTarget(e) { const r = cv.getBoundingClientRect(); follow.x = (e.clientX - r.left - ox) / sc; follow.y = Math.max(25, (oy - (e.clientY - r.top)) / sc); }
+let down = null;
+cv.addEventListener('pointerdown', e => {
+  if (mode === 'vision') {   // move the waiting part to where the floor was clicked
+    const b = blocks.find(b => b !== arm.held); if (b) { b.x = clamp(Math.round((e.clientX - cv.getBoundingClientRect().left - ox) / sc), PART.min, PART.max); b.y = BS / 2; b.vy = 0; b.ang = 0; }
+    return;
+  }
+  if (mode !== 'follow') return; setTarget(e); down = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => { if (mode === 'follow' && (e.pointerType === 'mouse' || down)) setTarget(e); });
+cv.addEventListener('pointerup', e => { if (mode !== 'follow' || !down) return; if (Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) arm.gTgt = (arm.held || arm.gTgt < 0.5) ? 1 : 0; down = null; });
+cv.addEventListener('wheel', e => { if (mode !== 'follow') return; e.preventDefault(); follow.phi = clamp(follow.phi + Math.sign(e.deltaY) * 5 * D, -Math.PI, Math.PI); syncPhi(); }, { passive: false });
+
+// ---------- loop ----------
+let last = performance.now(), acc = 0, teleAcc = 0;
+const clear = { cur: Infinity, last: null };
+let selfMin = { gap: Infinity, who: '' };
+// One control step of 1/240 s: the program (or following), gripper, parts, bin and torque readouts.
+function tick(H) {
+  if (runs(mode)) stepProgram(H);
+  else { const reach = Math.hypot(follow.x - SH.x, follow.y - SH.y) < REACH - 5; if (reach) arm.q = solve(follow.x, follow.y, follow.phi, true); }
+  updateGrip(H); updateBlocks(H); if (mode === 'vision') updateBin(); trackTorque(H);
+  if (arm.held) clear.cur = Math.min(clear.cur, partClearance());
+  else if (clear.cur < Infinity) { clear.last = clear.cur; clear.cur = Infinity; }
+  { const sn = selfClearance(arm.q); if (sn.gap < selfMin.gap) selfMin = sn; }
+}
+
+// ---------- recording one pick and drop ----------
+// Runs one vision cycle (park over the bin, look, pick the part, carry it, drop it, until it lands in the bin)
+// with the page's own control step, faster than real time, and returns one row per 1/240 s step: the program
+// line, tool and joint state, motor torques, clearances, and the inputs and outputs of every network call.
+const J5 = [1, 2, 3, 4, 5];
+const REC_HEAD = [['t', 's'], ['step_no', '-'], ['step', '-'], ['op', '-'], ['motion', '-'],
+  ['tool_x', 'mm'], ['tool_z', 'mm'], ['tool_angle', 'deg'],
+  ...J5.map(i => [`q_A${i}`, 'deg']), ...J5.map(i => [`qd_A${i}`, 'deg/s']), ...J5.map(i => [`qdd_A${i}`, 'deg/s^2']),
+  ...J5.map(i => [`torque_A${i}`, 'N m']), ...J5.map(i => [`torque_A${i}_of_limit`, '%']),
+  ['gripper_opening', '0 closed .. 1 open'], ['holding_part', '0/1'], ['payload', 'kg'], ['part_x', 'mm'], ['part_z', 'mm'],
+  ['self_clearance', 'mm'], ['self_closest_parts', '-'], ['part_clearance_from_arm', 'mm'], ['lowest_link_above_floor', 'mm'],
+  ['gnn_called', '0/1'], ['gnn_target_x', 'mm'], ['gnn_target_z', 'mm'], ['gnn_target_angle', 'deg'], ['gnn_target_payload', 'kg'],
+  ['gnn_in1_x', '(x - 0)/780, unitless'], ['gnn_in2_z', '(z - 160)/780, unitless'], ['gnn_in3_sin_angle', 'unitless'],
+  ['gnn_in4_cos_angle', 'unitless'], ['gnn_in5_payload', 'kg/12, unitless'],
+  ...J5.map(i => [`gnn_out_A${i}`, 'deg']),
+  ['pinn_active', '0/1'], ['pinn_s', 't/T, unitless'], ['pinn_T', 's'], ['pinn_payload', 'kg'],
+  ...J5.map(i => [`pinn_in${i}_q0_A${i}`, '(q0 - q_mid)/q_half, unitless']), ...J5.map(i => [`pinn_in${i + 5}_dq_A${i}`, '(q1 - q0)/q_half, unitless']),
+  ['pinn_in11_time', '2s - 1, unitless'], ['pinn_in12_log_T', 'ln(T / 1 s), unitless'], ['pinn_in13_payload', 'kg/12, unitless'],
+  ...J5.map(i => [`pinn_out_N_A${i}`, 'rad (path correction, times w(s))']),
+  ['mgnn_called', '0/1'], ['mgnn_s', 't/T of the moment asked, unitless'], ['mgnn_T', 's'],
+  ...J5.map(i => [`mgnn_in${i}_q0_A${i}`, '(q0 - q_mid)/q_half, unitless']),
+  ['mgnn_in6_x', '(x - 0)/780, unitless'], ['mgnn_in7_z', '(z - 160)/780, unitless'], ['mgnn_in8_sin_angle', 'unitless'],
+  ['mgnn_in9_cos_angle', 'unitless'], ['mgnn_in10_payload', 'kg/12, unitless'], ['mgnn_in11_time', '2 b(s) - 1, unitless'],
+  ['mgnn_in12_log_T', 'ln(T / 1 s), unitless'],
+  ...J5.map(i => [`mgnn_out_A${i}`, 'deg (end angle e at this moment)']), ...J5.map(i => [`mgnn_q_A${i}`, 'deg (joint angle at s)']),
+  ['vision_called', '0/1'], ['vision_out_x', 'mm'], ['vision_out_z', 'mm'], ['vision_true_x', 'mm'], ['vision_true_z', 'mm'], ['vision_error', 'mm']];
+function recordCycle({ motion: mo = 'pinn', kg = partMass, partX = null, maxS = 60 } = {}) {
+  const wasRunning = prog.running; setMotion(mo); partMass = kg; $('pm').value = kg; weightNote(); setMode('vision');
+  if (partX != null) blocks[0].x = partX;
+  prog.running = true; rec.on = true;
+  const H = 1 / 240, rows = []; let t = 0, cam = null;
+  const blank = k => new Array(k).fill('');
+  try {
+    while (t < maxS) {
+      rec.gnn = rec.pinn = rec.mgnn = rec.look = null;
+      const ln = prog.lines[prog.pc], pc = prog.pc;
+      tick(H); t += H;
+      const c = chain(arm.q), sn = selfClearance(arm.q), g = rec.gnn, pn = rec.pinn, mg = rec.mgnn, lk = rec.look, part = arm.held || blocks[0];
+      if (lk) cam = { img: Array.from(lk.img), w: VISION.cam.w, h: VISION.cam.h };
+      const how = ln.op === 'PTP' ? (prog.ph && prog.ph.mg || mg ? 'motion GNN' : pn ? 'PINN' : 'joint blend') : ln.op === 'LIN' ? (motion === 'mgnn' && MGNN ? 'straight line, keeps the motion GNN posture' : 'straight line, GNN tracking')
+        : ln.op === 'MOVE' ? 'path, GNN tracking' : ln.op === 'LOOK' ? 'camera' : 'gripper';
+      const low = Math.min(...c.p.slice(1, N).map((p, i) => p.y - LINK_RS[i]));
+      rows.push([t, pc + 1, ln.name, ln.op, how, c.t.x, c.t.y, c.phi / D, ...arm.q.map(v => v / D), ...rec.qd.map(v => v / D), ...rec.qdd.map(v => v / D),
+        ...tq.map((r, i) => r * A.tau_max[i]), ...tq.map(r => r * 100), arm.g, arm.held ? 1 : 0, load(), part ? part.x : '', part ? part.y : '',
+        sn.gap, sn.who, arm.held ? partClearance() : '', low,
+        g ? 1 : 0, ...(g ? [g.x, g.z, g.phi / D, g.m, ...g.in, ...g.out.map(v => v / D)] : blank(14)),
+        pn ? 1 : 0, ...(pn ? [pn.s, pn.T, pn.m, ...pn.x, ...pn.N] : blank(21)),
+        mg ? 1 : 0, ...(mg ? [mg.s, mg.T, ...mg.x, ...mg.e.map(v => v / D), ...mg.q.map(v => v / D)] : blank(24)),
+        lk ? 1 : 0, ...(lk ? [lk.det.x, lk.det.z, lk.part ? lk.part.x : '', lk.part ? lk.part.z : '', vis.err ?? ''] : blank(5))]);
+      if (vis.binned >= 1 && prog.lines[prog.pc].op === 'LOOK') break;   // dropped, landed in the bin, parked for the next look
+    }
+  } finally { rec.on = false; prog.running = wasRunning; }
+  return { head: REC_HEAD.map(h => h[0]), units: REC_HEAD.map(h => h[1]), rows, camera: cam, motion: mo, kg, solver };
+}
+function downloadCycle() {
+  const r = recordCycle({ motion, kg: partMass });
+  const esc = v => typeof v === 'number' ? +v.toFixed(6) : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v;
+  const csv = [r.head, r.units, ...r.rows].map(row => row.map(esc).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `arm5-pick-and-drop-${r.motion}-${r.kg}kg.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('rec').addEventListener('click', downloadCycle);
+window.ARM5_RECORD = recordCycle;   // for scripted exports
+window.ARM5_MOTION_GNN = MGNN;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; acc += dt; const H = 1 / 240;
+  while (acc >= H) {
+    tick(H);
+    acc -= H; sampleT += H;
+    if (sampleT >= 1 / 30) { sampleT -= 1 / 30; hist.push(tq.map(r => r * 100)); if (hist.length > TRN) hist.shift(); }
+  }
+  draw(); drawTrace();
+  teleAcc += dt; if (teleAcc > 0.1) { teleAcc = 0; tele(); }
+  requestAnimationFrame(frame);
+}
+arm.q = refine(GNN(STN.A, SAFE + 80, PHI_DOWN, 0), STN.A, SAFE + 80, PHI_DOWN, 3);
+setSolver('gnn'); fit(); setMode('program');
+$('run').textContent = prog.running ? 'Pause' : 'Run'; $('pm').value = partMass; weightNote(); $('spec-motors').textContent = A.tau_max.map(v => +v.toFixed(1)).join(' · ');
+tele(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

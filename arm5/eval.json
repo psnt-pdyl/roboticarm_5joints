@@ -1,0 +1,156 @@
+{
+  "gnn_alone": {
+    "tool_point_err_mm": {
+      "mean": 7.950246810913086,
+      "p95": 51.018089294433594,
+      "max": 592.3704223632812
+    },
+    "tool_angle_err_deg_mean": 0.5225858688354492,
+    "within_1mm_pct": 51.419997215270996,
+    "holding_effort": 0.13615280389785767,
+    "holding_peak_pct_mean": 22.467876970767975,
+    "over_a_motor_limit_pct": 0.0,
+    "past_joint_limit_pct": 0.0,
+    "max_joint_overshoot_deg": 0.0,
+    "below_floor_pct": 0.0,
+    "collides_pct": 7.9899996519088745
+  },
+  "gnn_plus_2_steps": {
+    "tool_point_err_mm": {
+      "mean": 0.4803024232387543,
+      "p95": 0.06934547424316406,
+      "max": 144.58839416503906
+    },
+    "tool_angle_err_deg_mean": 0.22279010713100433,
+    "within_1mm_pct": 96.95000052452087,
+    "holding_effort": 0.13642901182174683,
+    "holding_peak_pct_mean": 22.614367306232452,
+    "over_a_motor_limit_pct": 0.0,
+    "past_joint_limit_pct": 0.0,
+    "max_joint_overshoot_deg": 0.0,
+    "below_floor_pct": 0.13000000035390258,
+    "collides_pct": 12.65999972820282
+  },
+  "numerical_ik_from_rest": {
+    "tool_point_err_mm": {
+      "mean": 1.0279991626739502,
+      "p95": 0.00022217132209334522,
+      "max": 831.2916870117188
+    },
+    "tool_angle_err_deg_mean": 0.2787533104419708,
+    "within_1mm_pct": 98.3549952507019,
+    "holding_effort": 0.18269506096839905,
+    "holding_peak_pct_mean": 25.75334906578064,
+    "over_a_motor_limit_pct": 0.0,
+    "past_joint_limit_pct": 0.0,
+    "max_joint_overshoot_deg": 0.0,
+    "below_floor_pct": 0.6399999838322401,
+    "collides_pct": 32.97500014305115
+  },
+  "generating_random_pose": {
+    "tool_point_err_mm": {
+      "mean": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+    },
+    "tool_angle_err_deg_mean": 4.303466994315386e-06,
+    "within_1mm_pct": 100.0,
+    "holding_effort": 0.13924430310726166,
+    "holding_peak_pct_mean": 22.87449687719345,
+    "over_a_motor_limit_pct": 0.0,
+    "past_joint_limit_pct": 0.0,
+    "max_joint_overshoot_deg": 0.0,
+    "below_floor_pct": 0.0,
+    "collides_pct": 53.15999984741211
+  },
+  "least_torque_search_64": {
+    "tool_point_err_mm": {
+      "mean": 0.3471076786518097,
+      "p95": 0.054622892290353775,
+      "max": 777.1292724609375
+    },
+    "tool_angle_err_deg_mean": 0.0861835777759552,
+    "within_1mm_pct": 98.7749993801117,
+    "holding_effort": 0.11828291416168213,
+    "holding_peak_pct_mean": 20.984233915805817,
+    "over_a_motor_limit_pct": 0.0,
+    "past_joint_limit_pct": 0.0,
+    "max_joint_overshoot_deg": 0.0,
+    "below_floor_pct": 0.32999999821186066,
+    "collides_pct": 12.870000302791595
+  },
+  "station_targets": {
+    "0_kg": {
+      "gnn": 0.06812252104282379,
+      "numerical_from_rest": 0.08690837770700455,
+      "search_64": 0.056332387030124664,
+      "gnn_beats_numerical_pct": 97.99999594688416,
+      "worst_reach_err_mm": 0.00012302029062993824
+    },
+    "2_kg": {
+      "gnn": 0.09691575914621353,
+      "numerical_from_rest": 0.11367151141166687,
+      "search_64": 0.08620359003543854,
+      "gnn_beats_numerical_pct": 97.99999594688416,
+      "worst_reach_err_mm": 0.00018310546875
+    },
+    "5_kg": {
+      "gnn": 0.15036241710186005,
+      "numerical_from_rest": 0.16474506258964539,
+      "search_64": 0.14099884033203125,
+      "gnn_beats_numerical_pct": 81.99999928474426,
+      "worst_reach_err_mm": 0.00018310546875
+    },
+    "12_kg": {
+      "gnn": 0.3226415514945984,
+      "numerical_from_rest": 0.33491790294647217,
+      "search_64": 0.3112023174762726,
+      "gnn_beats_numerical_pct": 51.99999809265137,
+      "worst_reach_err_mm": 0.0001258271950064227
+    }
+  },
+  "carry_route": [
+    {
+      "part_x": 200.0,
+      "part_kg": 2.0,
+      "min_clearance_mm": 11.97579574584961,
+      "worst_reach_err_mm": 0.0001726334885461256,
+      "peak_holding_pct": 26.24501883983612
+    },
+    {
+      "part_x": 313.0,
+      "part_kg": 2.0,
+      "min_clearance_mm": 11.975772857666016,
+      "worst_reach_err_mm": 0.000152587890625,
+      "peak_holding_pct": 26.245015859603882
+    },
+    {
+      "part_x": 450.0,
+      "part_kg": 2.0,
+      "min_clearance_mm": 11.975791931152344,
+      "worst_reach_err_mm": 0.00018310546875,
+      "peak_holding_pct": 26.245015859603882
+    },
+    {
+      "part_x": 590.0,
+      "part_kg": 2.0,
+      "min_clearance_mm": 11.97574234008789,
+      "worst_reach_err_mm": 0.00017059844685718417,
+      "peak_holding_pct": 27.905577421188354
+    },
+    {
+      "part_x": 313.0,
+      "part_kg": 12.0,
+      "min_clearance_mm": 9.038200378417969,
+      "worst_reach_err_mm": 0.0001983642578125,
+      "peak_holding_pct": 45.22106647491455
+    },
+    {
+      "part_x": 590.0,
+      "part_kg": 12.0,
+      "min_clearance_mm": 9.038227081298828,
+      "worst_reach_err_mm": 0.00013647876039613038,
+      "peak_holding_pct": 48.70068430900574
+    }
+  ]
+}
